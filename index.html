@@ -555,7 +555,7 @@
       console.warn("Firebase fallback to localStorage.", e);
     }
 
-    const STORAGE_KEY = "habit_tracker_db_v26";
+    const STORAGE_KEY = "habit_tracker_db_v29";
 
     const defaultHabits = [
       { id: 'h1', name: 'PGP in Business & AI', targetMins: 30, schedule: 'everyday', startDate: '2026-08-01' },
@@ -570,6 +570,10 @@
       logs: {},
       reflections: {}
     };
+
+    if (!db.habits) db.habits = defaultHabits;
+    if (!db.logs) db.logs = {};
+    if (!db.reflections) db.reflections = {};
 
     let activeView = 'today';
     let currentDate = getFormattedDate(new Date());
@@ -586,6 +590,9 @@
         const cloudData = snapshot.val();
         if (cloudData) {
           db = cloudData;
+          if (!db.habits) db.habits = defaultHabits;
+          if (!db.logs) db.logs = {};
+          if (!db.reflections) db.reflections = {};
           localStorage.setItem(STORAGE_KEY, JSON.stringify(db));
           render();
         }
@@ -594,8 +601,12 @@
 
     function saveState() {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(db));
-      if (isFirebaseActive) {
-        dbRef.set(db);
+      if (isFirebaseActive && dbRef) {
+        try {
+          dbRef.set(db);
+        } catch (err) {
+          console.error("Firebase sync error:", err);
+        }
       }
       render();
     }
@@ -684,9 +695,13 @@
     }
 
     function ensureDateStructure(dateStr) {
+      if (!db.logs) db.logs = {};
       if (!db.logs[dateStr]) {
         db.logs[dateStr] = { habits: {}, tasks: [] };
       }
+      if (!db.logs[dateStr].habits) db.logs[dateStr].habits = {};
+      if (!db.logs[dateStr].tasks) db.logs[dateStr].tasks = [];
+
       db.habits.forEach(h => {
         if (!db.logs[dateStr].habits[h.id]) {
           db.logs[dateStr].habits[h.id] = { actualMins: 0, done: false };
@@ -727,7 +742,7 @@
     function exportTasksToCSV() {
       let csvContent = "data:text/csv;charset=utf-8,Title,Description,Priority,CreatedDate,DueDate,Completed\n";
       
-      Object.keys(db.logs).forEach(dateStr => {
+      Object.keys(db.logs || {}).forEach(dateStr => {
         (db.logs[dateStr].tasks || []).forEach(task => {
           const title = `"${(task.title || '').replace(/"/g, '""')}"`;
           const desc = `"${(task.desc || '').replace(/"/g, '""')}"`;
@@ -749,7 +764,6 @@
       document.body.removeChild(link);
     }
 
-    // ROBUST CSV IMPORT FIX
     function importTasksFromCSV(event) {
       const file = event.target.files[0];
       if (!file) return;
@@ -760,7 +774,6 @@
         const lines = text.split(/\r?\n/);
         if (lines.length <= 1) return;
 
-        // Parse header and remove invisible BOM / extra spaces
         const headers = lines[0].split(',').map(h => h.replace(/^[\uFEFF\s"']+|[\s"']+$/g, '').toLowerCase());
         
         const titleIdx = headers.findIndex(h => h.includes('title'));
@@ -776,9 +789,11 @@
           const line = lines[i].trim();
           if (!line) continue;
 
-          // Parse quoted CSV fields properly
-          const parts = line.match(/(?:[^\",]+|\"[^\"]*\")+/g);
-          if (!parts) continue;
+          // Simple CSV splitter fallback if regex matches nothing
+          let parts = line.match(/(?:[^\",]+|\"[^\"]*\")+/g);
+          if (!parts) {
+            parts = line.split(',');
+          }
 
           const cleanField = (idx) => (idx !== -1 && parts[idx]) ? parts[idx].replace(/^"|"$/g, '').replace(/""/g, '"').trim() : '';
 
@@ -952,11 +967,14 @@
       const title = document.getElementById('modalTaskTitle').value.trim();
       const desc = document.getElementById('modalTaskDesc').value.trim();
       const priority = normalizePriority(document.getElementById('modalTaskPriority').value);
-      const dueDate = document.getElementById('modalTaskDueDate').value || currentDate;
+      
+      let rawDueDate = document.getElementById('modalTaskDueDate').value;
+      const dueDate = rawDueDate ? getFormattedDate(parseLocalDate(rawDueDate)) : currentDate;
 
       if (!title) return;
 
       ensureDateStructure(currentDate);
+
       db.logs[currentDate].tasks.push({
         id: 't_' + Date.now(),
         title,
@@ -1013,6 +1031,7 @@
     }
 
     function openViewTaskModal(taskId, originDateStr) {
+      ensureDateStructure(originDateStr);
       const task = db.logs[originDateStr].tasks.find(t => t.id === taskId);
       if (!task) return;
 
@@ -1049,10 +1068,14 @@
       const taskId = document.getElementById('editTaskId').value;
       const originDateStr = document.getElementById('editTaskOriginDate').value;
 
+      ensureDateStructure(originDateStr);
       const task = db.logs[originDateStr].tasks.find(t => t.id === taskId);
       if (task) {
         task.priority = normalizePriority(document.getElementById('editTaskPriority').value);
-        task.dueDate = document.getElementById('editTaskDueDate').value;
+        
+        let rawDueDate = document.getElementById('editTaskDueDate').value;
+        task.dueDate = rawDueDate ? getFormattedDate(parseLocalDate(rawDueDate)) : originDateStr;
+        
         task.desc = document.getElementById('editTaskDesc').value.trim();
         task.subtasks = currentEditingSubtasks;
         closeViewTaskModal();
@@ -1062,6 +1085,7 @@
 
     function toggleTaskComplete(taskId, originDateStr, event) {
       event.stopPropagation();
+      ensureDateStructure(originDateStr);
       const task = db.logs[originDateStr].tasks.find(t => t.id === taskId);
       if (task) {
         task.completed = !task.completed;
@@ -1071,6 +1095,7 @@
 
     function deleteTask(taskId, originDateStr, event) {
       if (event) event.stopPropagation();
+      ensureDateStructure(originDateStr);
       db.logs[originDateStr].tasks = db.logs[originDateStr].tasks.filter(t => t.id !== taskId);
       saveState();
     }
@@ -1082,7 +1107,7 @@
       if (!db.reflections) db.reflections = {};
       db.reflections[weekKey] = text;
       localStorage.setItem(STORAGE_KEY, JSON.stringify(db));
-      if (isFirebaseActive) dbRef.set(db);
+      if (isFirebaseActive && dbRef) dbRef.set(db);
     }
 
     function render() {
@@ -1190,9 +1215,9 @@
       let overdueCount = 0;
 
       const overdueTasks = [];
-      Object.keys(db.logs).forEach(dateStr => {
+      Object.keys(db.logs || {}).forEach(dateStr => {
         if (dateStr < currentDate) {
-          db.logs[dateStr].tasks.forEach(task => {
+          (db.logs[dateStr].tasks || []).forEach(task => {
             if (!task.completed) {
               overdueCount++;
               const daysOverdue = calculateDaysOverdue(task.createdDate, currentDate);
@@ -1217,7 +1242,7 @@
         document.getElementById('statOverdueVal').innerText = "0";
       }
 
-      const currentTasks = db.logs[currentDate].tasks || [];
+      const currentTasks = db.logs[currentDate]?.tasks || [];
       const sortedTasks = [...currentTasks].sort((a, b) => Number(a.completed) - Number(b.completed));
 
       sortedTasks.forEach(task => {
@@ -1268,7 +1293,7 @@
 
     function renderStats() {
       const activeHabits = db.habits.filter(h => isHabitScheduledForDate(h, currentDate));
-      const hLogs = db.logs[currentDate].habits;
+      const hLogs = db.logs[currentDate]?.habits || {};
       let habitsDone = 0;
       let totalMinsLogged = 0;
       let totalMinsTarget = 0;
@@ -1288,7 +1313,7 @@
       document.getElementById('statMinsLogged').innerText = `${totalMinsLogged}m`;
       document.getElementById('statMinsSub').innerText = `${totalMinsTarget}m target`;
 
-      const tasks = db.logs[currentDate].tasks || [];
+      const tasks = db.logs[currentDate]?.tasks || [];
       const tasksDone = tasks.filter(t => t.completed).length;
       const taskPct = tasks.length ? Math.round((tasksDone / tasks.length) * 100) : 0;
 
@@ -1308,7 +1333,7 @@
         let doneTasks = 0;
 
         if (log) {
-          habitsDone = activeHabits.filter(h => log.habits[h.id] && log.habits[h.id].done).length;
+          habitsDone = activeHabits.filter(h => log.habits && log.habits[h.id] && log.habits[h.id].done).length;
           totalTasks = log.tasks ? log.tasks.length : 0;
           doneTasks = log.tasks ? log.tasks.filter(t => t.completed).length : 0;
         }
@@ -1346,7 +1371,7 @@
       let totalTasksAllTime = 0;
       let completedTasksAllTime = 0;
 
-      Object.keys(db.logs).forEach(dateStr => {
+      Object.keys(db.logs || {}).forEach(dateStr => {
         const log = db.logs[dateStr];
         const activeHabits = db.habits.filter(h => isHabitScheduledForDate(h, dateStr));
         
@@ -1388,7 +1413,7 @@
         const activeHabits = db.habits.filter(h => isHabitScheduledForDate(h, dateStr));
         
         if (log) {
-          const habitsDone = activeHabits.filter(h => log.habits[h.id] && log.habits[h.id].done).length;
+          const habitsDone = activeHabits.filter(h => log.habits && log.habits[h.id] && log.habits[h.id].done).length;
           totalHabitPctSum += activeHabits.length ? (habitsDone / activeHabits.length) : 0;
 
           const totalTasks = log.tasks ? log.tasks.length : 0;
@@ -1428,12 +1453,12 @@
         const weeklyPct = Math.min(100, Math.round((habitMinsWeek / weeklyTargetMins) * 100));
 
         let streak = 0;
-        const dates = Object.keys(db.logs).sort().reverse();
+        const dates = Object.keys(db.logs || {}).sort().reverse();
         let countingStreak = true;
 
         dates.forEach(dateStr => {
           if (isHabitScheduledForDate(habit, dateStr)) {
-            const hLog = db.logs[dateStr].habits[habit.id];
+            const hLog = db.logs[dateStr]?.habits?.[habit.id];
             if (hLog && hLog.done) {
               if (countingStreak) streak++;
             } else if (dateStr < currentDate) {
@@ -1473,7 +1498,7 @@
       let monthCompletedHabits = 0;
       let monthTasksDoneCount = 0;
 
-      Object.keys(db.logs).forEach(dateStr => {
+      Object.keys(db.logs || {}).forEach(dateStr => {
         if (dateStr.startsWith(selectedMonthKey)) {
           const log = db.logs[dateStr];
           const activeHabits = db.habits.filter(h => isHabitScheduledForDate(h, dateStr));
@@ -1507,7 +1532,7 @@
         let habitMinsMonth = 0;
         let habitDaysCount = 0;
 
-        Object.keys(db.logs).forEach(dateStr => {
+        Object.keys(db.logs || {}).forEach(dateStr => {
           if (dateStr.startsWith(selectedMonthKey) && isHabitScheduledForDate(habit, dateStr)) {
             habitDaysCount++;
             const log = db.logs[dateStr];
