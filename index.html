@@ -1,0 +1,1532 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Habit & Task Tracker</title>
+  
+  <!-- Firebase SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+
+  <style>
+    :root {
+      --bg-dark: #090d12;
+      --panel-bg: #12181f;
+      --panel-border: #1e2631;
+      --text-main: #e2e8f0;
+      --text-muted: #94a3b8;
+
+      --pastel-mint: #a7f3d0;
+      --pastel-mint-dark: #065f46;
+      --pastel-sky: #bae6fd;
+      --pastel-sky-dark: #0369a1;
+      --pastel-lavender: #ddd6fe;
+      --pastel-lavender-dark: #5b21b6;
+      --pastel-rose: #fecdd3;
+      --pastel-rose-dark: #9f1239;
+      --pastel-amber: #fef3c7;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+    body { background-color: var(--bg-dark); color: var(--text-main); display: flex; height: 100vh; overflow: hidden; }
+
+    aside { width: 210px; background-color: var(--panel-bg); border-right: 1px solid var(--panel-border); padding: 12px 10px; display: flex; flex-direction: column; gap: 8px; flex-shrink: 0; }
+    .brand { display: flex; align-items: center; gap: 8px; font-weight: bold; font-size: 15px; margin-bottom: 4px; color: #f8fafc; }
+    .brand-icon { background: var(--pastel-sky-dark); color: var(--pastel-sky); padding: 2px 6px; border-radius: 4px; font-size: 12px; font-weight: bold; }
+    .nav-btn { background: transparent; border: none; color: var(--text-muted); padding: 6px 8px; border-radius: 4px; text-align: left; cursor: pointer; font-size: 12px; font-weight: 500; }
+    .nav-btn:hover { background: #1c232d; color: var(--text-main); }
+    .nav-btn.active { background: #1c232d; border: 1px solid var(--panel-border); color: var(--pastel-sky); font-weight: 600; }
+    .sidebar-section { font-size: 11px; color: var(--text-muted); margin-bottom: 2px; text-transform: uppercase; letter-spacing: 0.5px; }
+
+    .sidebar-action-btn { width: 100%; text-align: left; padding: 6px 8px; border-radius: 4px; font-size: 12px; font-weight: 500; background-color: var(--pastel-sky-dark); color: var(--pastel-sky); border: none; }
+    .sidebar-action-btn:hover { background-color: #0284c7; }
+    .sidebar-secondary-btn { width: 100%; text-align: left; padding: 5px 8px; border-radius: 4px; font-size: 11px; color: var(--text-muted); background: #0d1217; border: 1px solid var(--panel-border); }
+    .sidebar-secondary-btn:hover { color: var(--text-main); border-color: var(--text-muted); }
+
+    main { flex: 1; padding: 12px 16px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
+    
+    header { display: flex; justify-content: space-between; align-items: center; }
+    .header-title h1 { font-size: 20px; font-weight: 600; color: #f8fafc; }
+    .header-title p { font-size: 12px; color: var(--text-muted); margin-top: 1px; }
+    .date-controls { display: flex; gap: 4px; align-items: center; }
+    
+    button { background-color: #1c232d; border: 1px solid var(--panel-border); color: var(--text-main); padding: 3px 8px; border-radius: 4px; cursor: pointer; font-size: 12px; }
+    button:hover { border-color: var(--text-muted); }
+    button.btn-cyan { background-color: var(--pastel-sky-dark); border-color: transparent; color: var(--pastel-sky); font-weight: 500; }
+    button.btn-cyan:hover { background-color: #0284c7; }
+    input, textarea, select { background-color: #090d12; border: 1px solid var(--panel-border); color: var(--text-main); padding: 3px 6px; border-radius: 4px; font-size: 12px; }
+    input:focus, textarea:focus, select:focus { outline: none; border-color: var(--pastel-sky); }
+
+    textarea.auto-expand { resize: none; min-height: 50px; max-height: 180px; overflow-y: auto; line-height: 1.3; }
+
+    .celebration-banner { background-color: rgba(167, 243, 208, 0.1); border: 1px solid var(--pastel-mint-dark); padding: 8px 12px; border-radius: 6px; color: var(--pastel-mint); font-size: 12px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+    .inline-overdue-badge { background-color: rgba(254, 205, 211, 0.1); border: 1px solid var(--pastel-rose-dark); padding: 2px 6px; border-radius: 4px; display: inline-flex; align-items: center; gap: 6px; color: var(--pastel-rose); font-size: 11px; font-weight: 500; }
+    .inline-overdue-badge button { background: transparent; border: none; color: var(--pastel-rose); text-decoration: underline; padding: 0; font-size: 11px; }
+
+    .workspace { display: grid; grid-template-columns: 1.2fr 0.8fr; gap: 12px; align-items: start; }
+    .left-column { display: flex; flex-direction: column; gap: 10px; }
+    
+    .stats-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; width: 100%; }
+    .stat-card { background: var(--panel-bg); border: 1px solid var(--panel-border); padding: 6px 10px; border-radius: 6px; }
+    .stat-card .label { font-size: 11px; color: var(--text-muted); white-space: nowrap; }
+    .stat-card .val { font-size: 18px; font-weight: bold; margin: 1px 0; color: #f8fafc; }
+    .stat-card .sub { font-size: 10px; color: var(--text-muted); white-space: nowrap; }
+
+    .insights-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+    .insight-card { background: #0d1217; border: 1px solid var(--panel-border); padding: 10px; border-radius: 6px; display: flex; flex-direction: column; gap: 2px; }
+    .insight-card .title { font-size: 11px; color: var(--text-muted); font-weight: 600; }
+    .insight-card .big-val { font-size: 20px; font-weight: bold; color: var(--pastel-sky); }
+    .insight-card .desc { font-size: 10px; color: var(--text-main); }
+
+    .panel { background: var(--panel-bg); border: 1px solid var(--panel-border); border-radius: 6px; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; transition: box-shadow 0.3s ease; }
+    .panel.all-habits-complete { box-shadow: 0 0 12px rgba(167, 243, 208, 0.25); border-color: var(--pastel-mint-dark); }
+    .panel-header { display: flex; justify-content: space-between; align-items: center; }
+    .panel-header h2 { font-size: 14px; font-weight: 600; color: #f8fafc; }
+    .panel-sub { font-size: 11px; color: var(--text-muted); margin-top: -4px; margin-bottom: 2px; }
+
+    .habit-item { background: #0d1217; border: 1px solid var(--panel-border); padding: 6px 8px; border-radius: 4px; display: flex; flex-direction: column; gap: 4px; }
+    .habit-top-line { display: flex; justify-content: space-between; align-items: center; }
+    .habit-name { font-weight: 600; font-size: 13px; color: #f8fafc; }
+    .habit-schedule-tag { font-size: 10px; color: var(--pastel-sky); background: rgba(186, 230, 253, 0.1); padding: 0px 4px; border-radius: 3px; font-weight: 500; margin-left: 4px; }
+    .habit-date-tag { font-size: 10px; color: var(--text-muted); background: #1c232d; padding: 0px 4px; border-radius: 3px; margin-left: 4px; }
+    .habit-mins-sub { font-size: 11px; color: var(--text-muted); }
+    
+    .habit-bottom-line { display: flex; align-items: center; gap: 8px; margin-top: 1px; }
+    .habit-progress-bar { flex: 1; height: 5px; background: #1c232d; border-radius: 3px; overflow: hidden; }
+    .habit-progress-fill { height: 100%; background: linear-gradient(90deg, var(--pastel-sky), var(--pastel-mint)); width: 0%; transition: width 0.3s ease; }
+    
+    .habit-actions-inline { display: flex; align-items: center; gap: 4px; font-size: 11px; color: var(--text-muted); }
+    .habit-actions-inline input[type="number"] { width: 42px; text-align: center; padding: 1px 2px; height: 22px; }
+    .checkbox-done { display: flex; align-items: center; gap: 3px; cursor: pointer; user-select: none; }
+    .checkbox-done input { cursor: pointer; accent-color: var(--pastel-mint); }
+
+    .task-group { display: flex; flex-direction: column; gap: 6px; }
+    .task-group-title { font-size: 12px; font-weight: 600; color: var(--text-muted); border-bottom: 1px solid var(--panel-border); padding-bottom: 2px; }
+    
+    .task-card { background: #0d1217; border: 1px solid var(--panel-border); padding: 6px 8px; border-radius: 4px; display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; cursor: pointer; transition: border-color 0.15s, opacity 0.2s; }
+    .task-card:hover { border-color: var(--text-muted); }
+    .task-card.is-completed { opacity: 0.55; }
+    
+    .task-main { display: flex; gap: 8px; flex: 1; }
+    .task-main input[type="checkbox"] { margin-top: 2px; cursor: pointer; accent-color: var(--pastel-mint); }
+    .task-info { display: flex; flex-direction: column; gap: 2px; width: 100%; }
+    .task-title { font-size: 13px; font-weight: 600; color: #f8fafc; }
+    .task-meta { font-size: 11px; color: var(--text-muted); }
+    .task-desc-snippet { font-size: 11px; color: var(--text-main); margin-top: 1px; white-space: pre-wrap; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+    
+    .subtask-mini-list { margin-top: 4px; display: flex; flex-direction: column; gap: 2px; }
+    .subtask-mini-item { font-size: 11px; display: flex; align-items: center; gap: 4px; color: var(--text-muted); }
+    .subtask-mini-item.done { text-decoration: line-through; opacity: 0.6; }
+
+    .task-actions { display: flex; gap: 4px; flex-shrink: 0; }
+
+    .priority-tag { font-size: 9px; padding: 1px 4px; border-radius: 3px; text-transform: uppercase; font-weight: bold; }
+    .priority-High { background: rgba(254, 205, 211, 0.15); color: var(--pastel-rose); }
+    .priority-Medium { background: rgba(254, 243, 199, 0.15); color: var(--pastel-amber); }
+    .priority-Low { background: rgba(186, 230, 253, 0.15); color: var(--pastel-sky); }
+
+    .weekly-cards-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+    .day-card { background: #0d1217; border: 1px solid var(--panel-border); padding: 8px 6px; border-radius: 4px; font-size: 11px; display: flex; flex-direction: column; gap: 4px; }
+    .day-card.selected-day { border-color: var(--pastel-mint); }
+    .day-card-header { font-weight: 600; color: var(--text-main); font-size: 12px; }
+    
+    .day-card-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; align-items: end; margin-top: 2px; }
+    .day-card-col { display: flex; flex-direction: column; gap: 2px; align-items: flex-start; }
+    .v-bar-track { width: 100%; height: 26px; background: #1c232d; border-radius: 2px; overflow: hidden; display: flex; flex-direction: column; justify-content: flex-end; }
+    .v-bar-fill-habit { width: 100%; background: linear-gradient(0deg, var(--pastel-sky), var(--pastel-mint)); transition: height 0.3s ease; }
+    .v-bar-fill-task { width: 100%; background: var(--pastel-lavender); transition: height 0.3s ease; }
+    .bar-sub-label { font-size: 10px; color: var(--text-muted); white-space: nowrap; }
+
+    .modal-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center; z-index: 100; }
+    .modal-box { background: var(--panel-bg); border: 1px solid var(--panel-border); border-radius: 6px; padding: 14px; width: 420px; max-width: 90%; display: flex; flex-direction: column; gap: 10px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
+    .modal-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--panel-border); padding-bottom: 6px; }
+    .modal-header h3 { font-size: 15px; font-weight: 600; color: #f8fafc; }
+    .modal-close { background: transparent; border: none; color: var(--text-muted); font-size: 16px; cursor: pointer; }
+    
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+
+  <!-- Sidebar -->
+  <aside>
+    <div class="brand">
+      <span class="brand-icon">HT</span> Habit Tracker
+    </div>
+    <button id="navToday" class="nav-btn active" onclick="switchView('today')">Today</button>
+    <button id="navWeekly" class="nav-btn" onclick="switchView('weekly')">Weekly Dashboard & Insights</button>
+    <button id="navMonthly" class="nav-btn" onclick="switchView('monthly')">Monthly Overview</button>
+
+    <!-- Action Buttons -->
+    <div style="display: flex; flex-direction: column; gap: 4px; margin-top: 2px;">
+      <button class="sidebar-action-btn" onclick="openAddHabitModal()">+ Add Habit</button>
+      <button class="sidebar-action-btn" onclick="openAddTaskModal()">+ Add Task</button>
+    </div>
+
+    <!-- Excel Export / Import -->
+    <div style="display: flex; flex-direction: column; gap: 4px; margin-top: 6px;">
+      <div class="sidebar-section">Excel Tasks</div>
+      <button class="sidebar-secondary-btn" onclick="exportTasksToCSV()">📥 Export Tasks (CSV)</button>
+      <button class="sidebar-secondary-btn" onclick="document.getElementById('importCsvInput').click()">📤 Import Tasks (CSV)</button>
+      <input type="file" id="importCsvInput" accept=".csv" class="hidden" onchange="importTasksFromCSV(event)">
+    </div>
+
+    <div style="margin-top: auto; display: flex; flex-direction: column; gap: 10px;">
+      <div>
+        <div class="sidebar-section">Selected date</div>
+        <input type="date" id="datePicker" style="width: 100%;">
+      </div>
+      <div>
+        <div class="sidebar-section">Current week</div>
+        <div id="sidebarWeekRange" style="font-size: 12px; font-weight: 600; color: var(--text-main);">Mon, 10 Aug – Sun, 16 Aug</div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main Workspace -->
+  <main>
+    <header>
+      <div class="header-title">
+        <h1 id="headerTitle">Today</h1>
+        <p id="headerSubtitle">Track what happened on this date. Unfinished older tasks surface automatically.</p>
+      </div>
+      <div class="date-controls">
+        <button id="btnPrevDay">&lt;</button>
+        <button id="btnToday">Today</button>
+        <button id="btnNextDay">&gt;</button>
+      </div>
+    </header>
+
+    <!-- VIEW 1: TODAY DASHBOARD -->
+    <div id="viewToday" class="view-container">
+      <div class="workspace">
+        <div class="left-column">
+          <div class="stats-grid">
+            <div class="stat-card">
+              <div class="label">Habit completion</div>
+              <div class="val" id="statHabitPct">0%</div>
+              <div class="sub" id="statHabitSub">0 of 0 complete</div>
+            </div>
+            <div class="stat-card">
+              <div class="label">Minutes logged</div>
+              <div class="val" id="statMinsLogged">0m</div>
+              <div class="sub" id="statMinsSub">0m target</div>
+            </div>
+            <div class="stat-card">
+              <div class="label">Tasks done</div>
+              <div class="val" id="statTaskPct">0%</div>
+              <div class="sub" id="statTaskSub">0 of 0 complete</div>
+            </div>
+            <div class="stat-card">
+              <div class="label">Overdue now</div>
+              <div class="val" id="statOverdueVal">0</div>
+              <div class="sub">Live from previous dates</div>
+            </div>
+          </div>
+
+          <div id="celebrationBanner" class="celebration-banner hidden">
+            ✨ All daily habits completed! Excellent consistency today.
+          </div>
+
+          <div class="panel" id="habitsPanel">
+            <div class="panel-header">
+              <h2>Daily habits</h2>
+            </div>
+            <p class="panel-sub">Log actual minutes. A habit counts complete when it reaches target or is checked done.</p>
+
+            <div id="habitsContainer" style="display:flex; flex-direction:column; gap:6px;"></div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-header">
+            <h2>Tasks</h2>
+            <div id="inlineOverdueBadge" class="inline-overdue-badge hidden">
+              <span>⚠️ <strong id="overdueBadgeCount">0 overdue</strong></span>
+              <button onclick="scrollToOverdue()">Review</button>
+            </div>
+          </div>
+
+          <div class="task-group hidden" id="overdueSection">
+            <div class="task-group-title" style="color: var(--pastel-rose);">Overdue, carried forward</div>
+            <div id="overdueTasksContainer" style="display:flex; flex-direction:column; gap:6px;"></div>
+          </div>
+
+          <div class="task-group">
+            <div class="task-group-title">Added today</div>
+            <div id="todayTasksContainer" style="display:flex; flex-direction:column; gap:6px;"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- VIEW 2: UNIFIED WEEKLY DASHBOARD & INSIGHTS -->
+    <div id="viewWeekly" class="view-container hidden" style="display: flex; flex-direction: column; gap: 14px;">
+      <div class="panel">
+        <div class="panel-header">
+          <h2>Overall Performance Metrics</h2>
+        </div>
+        <div class="insights-grid">
+          <div class="insight-card">
+            <div class="title">Total Time Focused</div>
+            <div class="big-val" id="insightTotalMins">0h 0m</div>
+            <div class="desc">Accumulated time spent across habits.</div>
+          </div>
+          <div class="insight-card">
+            <div class="title">Habit Consistency Rate</div>
+            <div class="big-val" id="insightHabitConsistency">0%</div>
+            <div class="desc">Ratio of scheduled habit targets achieved.</div>
+          </div>
+          <div class="insight-card">
+            <div class="title">Overall Task Completion</div>
+            <div class="big-val" id="insightTaskCompletion">0%</div>
+            <div class="desc">Total tasks completed vs created.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header">
+          <h2>Weekly Dashboard Overview</h2>
+        </div>
+        <p id="weeklySummaryStats" style="font-size: 12px; color: var(--text-muted); margin-top: -4px;">
+          0% average habit completion, 0% average task completion, 0m logged.
+        </p>
+        <div id="weeklyFullCardsContainer" class="weekly-cards-grid" style="margin-top: 6px;"></div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header">
+          <h2>Weekly Reflections & Qualitative Notes</h2>
+        </div>
+        <textarea id="weeklyReflectionNotes" class="auto-expand" style="width:100%;" placeholder="Capture key takeaways or context for this week..." oninput="saveWeeklyReflection()"></textarea>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header">
+          <h2>Habit Totals & Active Streaks</h2>
+        </div>
+        <div id="weeklyHabitsBreakdownContainer" style="display: flex; flex-direction: column; gap: 8px;"></div>
+      </div>
+    </div>
+
+    <!-- VIEW 3: MONTHLY OVERVIEW -->
+    <div id="viewMonthly" class="view-container hidden" style="display: flex; flex-direction: column; gap: 14px;">
+      <div class="panel">
+        <div class="panel-header">
+          <h2 id="monthlyTitleDisplay">Monthly Overview</h2>
+        </div>
+        <p id="monthlySummaryText" style="font-size: 12px; color: var(--text-muted); margin-top: -4px;">
+          Month-on-month stats and cumulative habit logs.
+        </p>
+
+        <div class="insights-grid" style="margin-top: 6px;">
+          <div class="insight-card">
+            <div class="title">Monthly Focused Time</div>
+            <div class="big-val" id="monthTotalHours">0h 0m</div>
+            <div class="desc">Total time logged in this month.</div>
+          </div>
+          <div class="insight-card">
+            <div class="title">Month Habit Completion</div>
+            <div class="big-val" id="monthHabitPct">0%</div>
+            <div class="desc">Avg completion rate for active days.</div>
+          </div>
+          <div class="insight-card">
+            <div class="title">Month Tasks Completed</div>
+            <div class="big-val" id="monthTasksDone">0</div>
+            <div class="desc">Total tasks finished this month.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header">
+          <h2>Monthly Habit Totals</h2>
+        </div>
+        <div id="monthlyHabitsContainer" style="display: flex; flex-direction: column; gap: 8px;"></div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- MODALS -->
+  <div id="addTaskModal" class="modal-overlay hidden">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3>Create New Task</h3>
+        <button class="modal-close" onclick="closeAddTaskModal()">✕</button>
+      </div>
+      <input type="text" id="modalTaskTitle" placeholder="Task name or title">
+      <textarea id="modalTaskDesc" class="auto-expand" rows="3" placeholder="Description or notes (optional)" oninput="autoResizeTextarea(this)"></textarea>
+      <div style="display: flex; gap: 8px;">
+        <div style="flex:1;">
+          <label style="font-size: 11px; color: var(--text-muted); display: block; margin-bottom: 2px;">Priority</label>
+          <select id="modalTaskPriority" style="width: 100%;">
+            <option value="Low">Low Priority</option>
+            <option value="Medium" selected>Medium Priority</option>
+            <option value="High">High Priority</option>
+          </select>
+        </div>
+        <div style="flex:1;">
+          <label style="font-size: 11px; color: var(--text-muted); display: block; margin-bottom: 2px;">Due Date</label>
+          <input type="date" id="modalTaskDueDate" style="width: 100%;">
+        </div>
+      </div>
+
+      <div>
+        <label style="font-size: 11px; color: var(--text-muted); display: block; margin-bottom: 4px;">Sub-Task Checklist</label>
+        <div id="modalSubtasksContainer" style="display:flex; flex-direction:column; gap:4px; margin-bottom:6px;"></div>
+        <div style="display:flex; gap:6px;">
+          <input type="text" id="modalSubtaskInput" placeholder="Add a sub-task step..." style="flex:1;">
+          <button onclick="addModalSubtask()">+ Add Step</button>
+        </div>
+      </div>
+
+      <div style="display: flex; justify-content: flex-end; gap: 6px; margin-top: 4px;">
+        <button onclick="closeAddTaskModal()">Cancel</button>
+        <button class="btn-cyan" onclick="saveTaskFromModal()">Save Task</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="addHabitModal" class="modal-overlay hidden">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3>Create New Habit</h3>
+        <button class="modal-close" onclick="closeAddHabitModal()">✕</button>
+      </div>
+      <div>
+        <label style="font-size: 11px; color: var(--text-muted); display: block; margin-bottom: 2px;">Habit Name</label>
+        <input type="text" id="addHabitName" placeholder="e.g. Reading, Meditating" style="width: 100%;">
+      </div>
+      <div style="display: flex; gap: 8px;">
+        <div style="flex:1;">
+          <label style="font-size: 11px; color: var(--text-muted); display: block; margin-bottom: 2px;">Schedule Days</label>
+          <select id="addHabitSchedule" style="width: 100%;">
+            <option value="everyday">Everyday</option>
+            <option value="weekdays">Weekdays (Mon-Fri)</option>
+            <option value="weekends">Weekends (Sat-Sun)</option>
+          </select>
+        </div>
+        <div style="flex:1;">
+          <label style="font-size: 11px; color: var(--text-muted); display: block; margin-bottom: 2px;">Start Date</label>
+          <input type="date" id="addHabitStartDate" style="width: 100%;">
+        </div>
+      </div>
+      <div>
+        <label style="font-size: 11px; color: var(--text-muted); display: block; margin-bottom: 2px;">Target Minutes</label>
+        <input type="number" id="addHabitTarget" value="30" style="width: 100%;">
+      </div>
+      <div style="display: flex; justify-content: flex-end; gap: 6px; margin-top: 4px;">
+        <button onclick="closeAddHabitModal()">Cancel</button>
+        <button class="btn-cyan" onclick="saveHabitFromModal()">Save Habit</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="viewTaskModal" class="modal-overlay hidden">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3 id="viewTaskTitle">Task Details</h3>
+        <button class="modal-close" onclick="closeViewTaskModal()">✕</button>
+      </div>
+      <input type="hidden" id="editTaskId">
+      <input type="hidden" id="editTaskOriginDate">
+      
+      <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px;">
+        <div style="flex:1;">
+          <label style="font-size: 11px; color: var(--text-muted); display: block; margin-bottom: 2px;">Priority</label>
+          <select id="editTaskPriority" style="width: 100%;">
+            <option value="Low">Low Priority</option>
+            <option value="Medium">Medium Priority</option>
+            <option value="High">High Priority</option>
+          </select>
+        </div>
+        <div style="flex:1;">
+          <label style="font-size: 11px; color: var(--text-muted); display: block; margin-bottom: 2px;">Due Date</label>
+          <input type="date" id="editTaskDueDate" style="width: 100%;">
+        </div>
+      </div>
+
+      <div id="viewTaskMeta" style="font-size: 11px; color: var(--text-muted);"></div>
+
+      <div>
+        <label style="font-size: 11px; color: var(--text-muted); display: block; margin-bottom: 2px;">Description</label>
+        <textarea id="editTaskDesc" class="auto-expand" style="width: 100%;" oninput="autoResizeTextarea(this)"></textarea>
+      </div>
+
+      <div>
+        <label style="font-size: 11px; color: var(--text-muted); display: block; margin-bottom: 4px;">Sub-Task Steps</label>
+        <div id="editSubtasksContainer" style="display:flex; flex-direction:column; gap:4px; margin-bottom:6px;"></div>
+        <div style="display:flex; gap:6px;">
+          <input type="text" id="editSubtaskInput" placeholder="Add another step..." style="flex:1;">
+          <button onclick="addEditSubtask()">+ Add Step</button>
+        </div>
+      </div>
+
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 6px;">
+        <button id="viewTaskDeleteBtn" style="color: var(--pastel-rose); border-color: rgba(254,205,211,0.3);">Delete Task</button>
+        <div style="display: flex; gap: 6px;">
+          <button onclick="closeViewTaskModal()">Cancel</button>
+          <button class="btn-cyan" onclick="saveTaskEdits()">Save Changes</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="editHabitModal" class="modal-overlay hidden">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3>Edit Habit</h3>
+        <button class="modal-close" onclick="closeEditHabitModal()">✕</button>
+      </div>
+      <input type="hidden" id="editHabitId">
+      <div>
+        <label style="font-size: 11px; color: var(--text-muted); display: block; margin-bottom: 2px;">Habit Name</label>
+        <input type="text" id="editHabitName" style="width: 100%;">
+      </div>
+      <div style="display: flex; gap: 8px;">
+        <div style="flex:1;">
+          <label style="font-size: 11px; color: var(--text-muted); display: block; margin-bottom: 2px;">Schedule Days</label>
+          <select id="editHabitSchedule" style="width: 100%;">
+            <option value="everyday">Everyday</option>
+            <option value="weekdays">Weekdays (Mon-Fri)</option>
+            <option value="weekends">Weekends (Sat-Sun)</option>
+          </select>
+        </div>
+        <div style="flex:1;">
+          <label style="font-size: 11px; color: var(--text-muted); display: block; margin-bottom: 2px;">Start Date</label>
+          <input type="date" id="editHabitStartDate" style="width: 100%;">
+        </div>
+      </div>
+      <div>
+        <label style="font-size: 11px; color: var(--text-muted); display: block; margin-bottom: 2px;">Target Minutes</label>
+        <input type="number" id="editHabitTarget" style="width: 100%;">
+      </div>
+      <div style="display: flex; justify-content: flex-end; gap: 6px; margin-top: 4px;">
+        <button onclick="closeEditHabitModal()">Cancel</button>
+        <button class="btn-cyan" onclick="saveHabitEdits()">Save Changes</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // -------------------------------------------------------------------------
+    // REPLACE WITH YOUR FIREBASE CONFIG KEYS FROM PART 1, STEP 3:
+    // -------------------------------------------------------------------------
+   const firebaseConfig = {
+      apiKey: "AIzaSyAADHVg2icoi5RAbRuqekHnhGgi6FoigII",
+      authDomain: "my-habit-tracker-f0c82.firebaseapp.com",
+      databaseURL: "https://my-habit-tracker-f0c82-default-rtdb.asia-southeast1.firebasedatabase.app",
+      projectId: "my-habit-tracker-f0c82",
+      storageBucket: "my-habit-tracker-f0c82.firebasestorage.app",
+      messagingSenderId: "557940676372",
+      appId: "1:557940676372:web:e9d5d8f15a9e8a4f7cd401",
+      measurementId: "G-GHME6RSBQX"
+    };
+
+    // Initialize Firebase
+    let dbRef = null;
+    let isFirebaseActive = false;
+
+    try {
+      if (firebaseConfig.apiKey !== "YOUR_API_KEY") {
+        firebase.initializeApp(firebaseConfig);
+        dbRef = firebase.database().ref("habit_tracker_db");
+        isFirebaseActive = true;
+      }
+    } catch (e) {
+      console.warn("Firebase not configured or invalid key, falling back to localStorage.", e);
+    }
+
+    const STORAGE_KEY = "habit_tracker_db_v24";
+
+    const defaultHabits = [
+      { id: 'h1', name: 'PGP in Business & AI', targetMins: 30, schedule: 'everyday', startDate: '2026-08-01' },
+      { id: 'h2', name: 'AI Builder Quest', targetMins: 30, schedule: 'everyday', startDate: '2026-08-01' },
+      { id: 'h3', name: 'Veeva', targetMins: 30, schedule: 'weekdays', startDate: '2026-08-01' },
+      { id: 'h4', name: 'Exercise', targetMins: 45, schedule: 'everyday', startDate: '2026-08-01' },
+      { id: 'h5', name: 'Strategy', targetMins: 30, schedule: 'everyday', startDate: '2026-08-01' }
+    ];
+
+    let db = JSON.parse(localStorage.getItem(STORAGE_KEY)) || {
+      habits: defaultHabits,
+      logs: {},
+      reflections: {}
+    };
+
+    let activeView = 'today';
+    let currentDate = getFormattedDate(new Date());
+    let currentModalSubtasks = [];
+    let currentEditingSubtasks = [];
+
+    // Real-Time Firebase Listener
+    if (isFirebaseActive) {
+      dbRef.on('value', (snapshot) => {
+        const cloudData = snapshot.val();
+        if (cloudData) {
+          db = cloudData;
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(db));
+          render();
+        }
+      });
+    }
+
+    function saveState() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(db));
+      if (isFirebaseActive) {
+        dbRef.set(db);
+      }
+      render();
+    }
+
+    function getFormattedDate(d) {
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    }
+
+    function normalizePriority(p) {
+      if (!p) return 'Medium';
+      const clean = p.trim().toLowerCase();
+      if (clean === 'high') return 'High';
+      if (clean === 'low') return 'Low';
+      return 'Medium';
+    }
+
+    function parseLocalDate(dateStr) {
+      if (!dateStr) return new Date();
+      const monthsMap = { jan:0, feb:1, mar:2, apr:3, may:4, jun:5, jul:6, aug:7, sep:8, oct:9, nov:10, dec:11 };
+      const parts = dateStr.trim().split(/[-/]/);
+
+      if (parts.length === 3) {
+        if (parts[0].length === 4) return new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+        
+        const monthIdx = monthsMap[parts[1].toLowerCase()];
+        if (monthIdx !== undefined) {
+          const day = Number(parts[0]);
+          let year = Number(parts[2]);
+          if (year < 100) year += 2000;
+          return new Date(year, monthIdx, day);
+        }
+
+        const p1 = Number(parts[0]);
+        const p2 = Number(parts[1]);
+        let p3 = Number(parts[2]);
+        if (p3 < 100) p3 += 2000;
+
+        if (p1 > 12) return new Date(p3, p2 - 1, p1);
+        else return new Date(p3, p1 - 1, p2);
+      }
+
+      const parsed = new Date(dateStr);
+      return isNaN(parsed.getTime()) ? new Date() : parsed;
+    }
+
+    function formatDateDisplay(dateStr) {
+      const options = { weekday: 'long', day: 'numeric', month: 'short', year: 'numeric' };
+      return parseLocalDate(dateStr).toLocaleDateString('en-US', options);
+    }
+
+    function isHabitScheduledForDate(habit, dateStr) {
+      if (habit.startDate && dateStr < habit.startDate) return false;
+
+      const dayOfWeek = parseLocalDate(dateStr).getDay();
+      const schedule = habit.schedule || 'everyday';
+
+      if (schedule === 'weekdays') return dayOfWeek >= 1 && dayOfWeek <= 5;
+      if (schedule === 'weekends') return dayOfWeek === 0 || dayOfWeek === 6;
+      return true;
+    }
+
+    function autoResizeTextarea(textarea) {
+      textarea.style.height = 'auto';
+      textarea.style.height = Math.min(textarea.scrollHeight, 180) + 'px';
+    }
+
+    function switchView(view) {
+      activeView = view;
+      document.getElementById('navToday').classList.toggle('active', view === 'today');
+      document.getElementById('navWeekly').classList.toggle('active', view === 'weekly');
+      document.getElementById('navMonthly').classList.toggle('active', view === 'monthly');
+
+      document.getElementById('viewToday').classList.toggle('hidden', view !== 'today');
+      document.getElementById('viewWeekly').classList.toggle('hidden', view !== 'weekly');
+      document.getElementById('viewMonthly').classList.toggle('hidden', view !== 'monthly');
+
+      render();
+    }
+
+    function ensureDateStructure(dateStr) {
+      if (!db.logs[dateStr]) {
+        db.logs[dateStr] = { habits: {}, tasks: [] };
+      }
+      db.habits.forEach(h => {
+        if (!db.logs[dateStr].habits[h.id]) {
+          db.logs[dateStr].habits[h.id] = { actualMins: 0, done: false };
+        }
+      });
+    }
+
+    function calculateDaysOverdue(createdDateStr, currentDateStr) {
+      const created = parseLocalDate(createdDateStr);
+      const current = parseLocalDate(currentDateStr);
+      return Math.floor((current - created) / (1000 * 60 * 60 * 24));
+    }
+
+    function getWeekDays(referenceDateStr) {
+      const curr = parseLocalDate(referenceDateStr);
+      const dayOfWeek = curr.getDay();
+      const distanceToMon = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+      const monday = new Date(curr);
+      monday.setDate(curr.getDate() + distanceToMon);
+
+      const days = [];
+      for (let i = 0; i < 7; i++) {
+        const d = new Date(monday);
+        d.setDate(monday.getDate() + i);
+        days.push(getFormattedDate(d));
+      }
+      return days;
+    }
+
+    function scrollToOverdue() {
+      if (activeView !== 'today') switchView('today');
+      const target = document.getElementById('overdueTasksContainer');
+      if (target) {
+        target.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
+    }
+
+    function exportTasksToCSV() {
+      let csvContent = "data:text/csv;charset=utf-8,Title,Description,Priority,CreatedDate,DueDate,Completed\n";
+      
+      Object.keys(db.logs).forEach(dateStr => {
+        (db.logs[dateStr].tasks || []).forEach(task => {
+          const title = `"${(task.title || '').replace(/"/g, '""')}"`;
+          const desc = `"${(task.desc || '').replace(/"/g, '""')}"`;
+          const priority = task.priority || 'Medium';
+          const createdDate = task.createdDate || dateStr;
+          const dueDate = task.dueDate || createdDate;
+          const completed = task.completed ? "Yes" : "No";
+
+          csvContent += `${title},${desc},${priority},${createdDate},${dueDate},${completed}\n`;
+        });
+      });
+
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement("a");
+      link.setAttribute("href", encodedUri);
+      link.setAttribute("download", `tasks_export_${getFormattedDate(new Date())}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+
+    function importTasksFromCSV(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const text = e.target.result;
+        const lines = text.split("\n");
+        if (lines.length <= 1) return;
+
+        for (let i = 1; i < lines.length; i++) {
+          const line = lines[i].trim();
+          if (!line) continue;
+
+          const parts = line.match(/(?:[^\",]+|\"[^\"]*\")+/g);
+          if (!parts || parts.length < 5) continue;
+
+          const title = parts[0].replace(/^"|"$/g, '').replace(/""/g, '"').trim();
+          const desc = parts[1].replace(/^"|"$/g, '').replace(/""/g, '"').trim();
+          const priority = normalizePriority(parts[2].replace(/^"|"$/g, ''));
+          const rawCreatedDate = parts[3].replace(/^"|"$/g, '').trim();
+          const rawDueDate = parts[4].replace(/^"|"$/g, '').trim();
+          const completedStr = parts[5] ? parts[5].replace(/^"|"$/g, '').trim().toLowerCase() : 'no';
+
+          const createdDate = getFormattedDate(parseLocalDate(rawCreatedDate));
+          const dueDate = getFormattedDate(parseLocalDate(rawDueDate));
+          const completed = completedStr === 'yes' || completedStr === 'true';
+
+          if (title) {
+            ensureDateStructure(createdDate);
+            db.logs[createdDate].tasks.push({
+              id: 't_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
+              title,
+              desc,
+              priority,
+              dueDate,
+              createdDate,
+              completed,
+              subtasks: []
+            });
+          }
+        }
+
+        saveState();
+        alert("Tasks imported successfully!");
+        event.target.value = '';
+      };
+
+      reader.readAsText(file);
+    }
+
+    function openAddHabitModal() {
+      document.getElementById('addHabitName').value = '';
+      document.getElementById('addHabitTarget').value = '30';
+      document.getElementById('addHabitSchedule').value = 'everyday';
+      document.getElementById('addHabitStartDate').value = currentDate;
+      document.getElementById('addHabitModal').classList.remove('hidden');
+    }
+
+    function closeAddHabitModal() {
+      document.getElementById('addHabitModal').classList.add('hidden');
+    }
+
+    function saveHabitFromModal() {
+      const name = document.getElementById('addHabitName').value.trim();
+      const schedule = document.getElementById('addHabitSchedule').value;
+      const startDate = document.getElementById('addHabitStartDate').value || currentDate;
+      const target = parseInt(document.getElementById('addHabitTarget').value) || 30;
+
+      if (!name) return;
+
+      db.habits.push({
+        id: 'h_' + Date.now(),
+        name,
+        targetMins: target,
+        schedule,
+        startDate
+      });
+
+      closeAddHabitModal();
+      saveState();
+    }
+
+    function openEditHabitModal(habitId) {
+      const habit = db.habits.find(h => h.id === habitId);
+      if (!habit) return;
+
+      document.getElementById('editHabitId').value = habit.id;
+      document.getElementById('editHabitName').value = habit.name;
+      document.getElementById('editHabitTarget').value = habit.targetMins;
+      document.getElementById('editHabitSchedule').value = habit.schedule || 'everyday';
+      document.getElementById('editHabitStartDate').value = habit.startDate || currentDate;
+      document.getElementById('editHabitModal').classList.remove('hidden');
+    }
+
+    function closeEditHabitModal() {
+      document.getElementById('editHabitModal').classList.add('hidden');
+    }
+
+    function saveHabitEdits() {
+      const id = document.getElementById('editHabitId').value;
+      const name = document.getElementById('editHabitName').value.trim();
+      const target = parseInt(document.getElementById('editHabitTarget').value) || 30;
+      const schedule = document.getElementById('editHabitSchedule').value;
+      const startDate = document.getElementById('editHabitStartDate').value;
+
+      const habit = db.habits.find(h => h.id === id);
+      if (habit && name) {
+        habit.name = name;
+        habit.targetMins = target;
+        habit.schedule = schedule;
+        habit.startDate = startDate;
+        closeEditHabitModal();
+        saveState();
+      }
+    }
+
+    function deleteHabit(habitId) {
+      db.habits = db.habits.filter(h => h.id !== habitId);
+      saveState();
+    }
+
+    function updateHabitLog(habitId, field, val) {
+      ensureDateStructure(currentDate);
+      const hLog = db.logs[currentDate].habits[habitId];
+      if (field === 'actualMins') {
+        hLog.actualMins = parseInt(val) || 0;
+        const target = db.habits.find(h => h.id === habitId).targetMins;
+        if (hLog.actualMins >= target) hLog.done = true;
+      } else if (field === 'done') {
+        hLog.done = val;
+      }
+      saveState();
+    }
+
+    function renderModalSubtasks() {
+      const container = document.getElementById('modalSubtasksContainer');
+      container.innerHTML = '';
+      currentModalSubtasks.forEach((st, idx) => {
+        const item = document.createElement('div');
+        item.style.display = 'flex';
+        item.style.justifyContent = 'space-between';
+        item.style.alignItems = 'center';
+        item.style.fontSize = '12px';
+        item.innerHTML = `
+          <span>• ${st.title}</span>
+          <button style="font-size:10px;" onclick="removeModalSubtask(${idx})">Del</button>
+        `;
+        container.appendChild(item);
+      });
+    }
+
+    function addModalSubtask() {
+      const input = document.getElementById('modalSubtaskInput');
+      const title = input.value.trim();
+      if (title) {
+        currentModalSubtasks.push({ id: 'st_' + Date.now(), title, done: false });
+        input.value = '';
+        renderModalSubtasks();
+      }
+    }
+
+    function removeModalSubtask(idx) {
+      currentModalSubtasks.splice(idx, 1);
+      renderModalSubtasks();
+    }
+
+    function openAddTaskModal() {
+      const descEl = document.getElementById('modalTaskDesc');
+      document.getElementById('modalTaskTitle').value = '';
+      descEl.value = '';
+      descEl.style.height = '50px';
+      document.getElementById('modalTaskDueDate').value = currentDate;
+      currentModalSubtasks = [];
+      renderModalSubtasks();
+      document.getElementById('addTaskModal').classList.remove('hidden');
+    }
+
+    function closeAddTaskModal() {
+      document.getElementById('addTaskModal').classList.add('hidden');
+    }
+
+    function saveTaskFromModal() {
+      const title = document.getElementById('modalTaskTitle').value.trim();
+      const desc = document.getElementById('modalTaskDesc').value.trim();
+      const priority = normalizePriority(document.getElementById('modalTaskPriority').value);
+      const dueDate = document.getElementById('modalTaskDueDate').value || currentDate;
+
+      if (!title) return;
+
+      ensureDateStructure(currentDate);
+      db.logs[currentDate].tasks.push({
+        id: 't_' + Date.now(),
+        title,
+        desc,
+        priority,
+        dueDate,
+        createdDate: currentDate,
+        completed: false,
+        subtasks: currentModalSubtasks
+      });
+
+      closeAddTaskModal();
+      saveState();
+    }
+
+    function renderEditSubtasks() {
+      const container = document.getElementById('editSubtasksContainer');
+      container.innerHTML = '';
+      currentEditingSubtasks.forEach((st, idx) => {
+        const item = document.createElement('div');
+        item.style.display = 'flex';
+        item.style.justifyContent = 'space-between';
+        item.style.alignItems = 'center';
+        item.style.fontSize = '12px';
+        item.innerHTML = `
+          <label style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+            <input type="checkbox" ${st.done ? 'checked' : ''} onchange="toggleEditSubtask(${idx}, this.checked)">
+            <span style="${st.done ? 'text-decoration:line-through; color:var(--text-muted);' : ''}">${st.title}</span>
+          </label>
+          <button style="font-size:10px;" onclick="removeEditSubtask(${idx})">Del</button>
+        `;
+        container.appendChild(item);
+      });
+    }
+
+    function toggleEditSubtask(idx, done) {
+      currentEditingSubtasks[idx].done = done;
+      renderEditSubtasks();
+    }
+
+    function addEditSubtask() {
+      const input = document.getElementById('editSubtaskInput');
+      const title = input.value.trim();
+      if (title) {
+        currentEditingSubtasks.push({ id: 'st_' + Date.now(), title, done: false });
+        input.value = '';
+        renderEditSubtasks();
+      }
+    }
+
+    function removeEditSubtask(idx) {
+      currentEditingSubtasks.splice(idx, 1);
+      renderEditSubtasks();
+    }
+
+    function openViewTaskModal(taskId, originDateStr) {
+      const task = db.logs[originDateStr].tasks.find(t => t.id === taskId);
+      if (!task) return;
+
+      document.getElementById('editTaskId').value = taskId;
+      document.getElementById('editTaskOriginDate').value = originDateStr;
+      document.getElementById('viewTaskTitle').innerText = task.title;
+      document.getElementById('editTaskPriority').value = normalizePriority(task.priority);
+      document.getElementById('editTaskDueDate').value = task.dueDate || originDateStr;
+      
+      const descEl = document.getElementById('editTaskDesc');
+      descEl.value = task.desc || '';
+      autoResizeTextarea(descEl);
+
+      currentEditingSubtasks = task.subtasks ? JSON.parse(JSON.stringify(task.subtasks)) : [];
+      renderEditSubtasks();
+
+      document.getElementById('viewTaskMeta').innerText = 
+        `Added on ${formatDateDisplay(task.createdDate)}`;
+
+      const delBtn = document.getElementById('viewTaskDeleteBtn');
+      delBtn.onclick = () => {
+        deleteTask(taskId, originDateStr);
+        closeViewTaskModal();
+      };
+
+      document.getElementById('viewTaskModal').classList.remove('hidden');
+    }
+
+    function closeViewTaskModal() {
+      document.getElementById('viewTaskModal').classList.add('hidden');
+    }
+
+    function saveTaskEdits() {
+      const taskId = document.getElementById('editTaskId').value;
+      const originDateStr = document.getElementById('editTaskOriginDate').value;
+
+      const task = db.logs[originDateStr].tasks.find(t => t.id === taskId);
+      if (task) {
+        task.priority = normalizePriority(document.getElementById('editTaskPriority').value);
+        task.dueDate = document.getElementById('editTaskDueDate').value;
+        task.desc = document.getElementById('editTaskDesc').value.trim();
+        task.subtasks = currentEditingSubtasks;
+        closeViewTaskModal();
+        saveState();
+      }
+    }
+
+    function toggleTaskComplete(taskId, originDateStr, event) {
+      event.stopPropagation();
+      const task = db.logs[originDateStr].tasks.find(t => t.id === taskId);
+      if (task) {
+        task.completed = !task.completed;
+      }
+      saveState();
+    }
+
+    function deleteTask(taskId, originDateStr, event) {
+      if (event) event.stopPropagation();
+      db.logs[originDateStr].tasks = db.logs[originDateStr].tasks.filter(t => t.id !== taskId);
+      saveState();
+    }
+
+    function saveWeeklyReflection() {
+      const weekDays = getWeekDays(currentDate);
+      const weekKey = weekDays[0];
+      const text = document.getElementById('weeklyReflectionNotes').value;
+      if (!db.reflections) db.reflections = {};
+      db.reflections[weekKey] = text;
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(db));
+      if (isFirebaseActive) dbRef.set(db);
+    }
+
+    function render() {
+      ensureDateStructure(currentDate);
+      
+      const weekDays = getWeekDays(currentDate);
+      const startMon = parseLocalDate(weekDays[0]).toLocaleDateString('en-US', { day: 'numeric', month: 'short' });
+      const endSun = parseLocalDate(weekDays[6]).toLocaleDateString('en-US', { day: 'numeric', month: 'short' });
+      document.getElementById('sidebarWeekRange').innerText = `Mon, ${startMon} – Sun, ${endSun}`;
+
+      document.getElementById('datePicker').value = currentDate;
+
+      if (activeView === 'today') {
+        document.getElementById('headerTitle').innerText = formatDateDisplay(currentDate);
+        document.getElementById('headerSubtitle').innerText = "Track what happened on this date. Unfinished older tasks surface automatically.";
+        renderTodayView();
+      } else if (activeView === 'weekly') {
+        document.getElementById('headerTitle').innerText = "Weekly Dashboard & Insights";
+        document.getElementById('headerSubtitle').innerText = "Comprehensive summary of weekly progress, performance metrics, and habit streaks.";
+        renderWeeklyView(weekDays);
+      } else if (activeView === 'monthly') {
+        document.getElementById('headerTitle').innerText = "Monthly Overview";
+        document.getElementById('headerSubtitle').innerText = "Month-on-month stats, total hours logged, and habit progress.";
+        renderMonthlyView();
+      }
+
+      renderTasksAndOverdue();
+    }
+
+    function renderTodayView() {
+      renderHabits();
+      renderStats();
+    }
+
+    function renderHabits() {
+      const container = document.getElementById('habitsContainer');
+      const celebrationBanner = document.getElementById('celebrationBanner');
+      const habitsPanel = document.getElementById('habitsPanel');
+      container.innerHTML = '';
+
+      const activeHabits = db.habits.filter(h => isHabitScheduledForDate(h, currentDate));
+
+      if (activeHabits.length === 0) {
+        container.innerHTML = `<div style="font-size:12px; color:var(--text-muted); padding:6px 0;">No habits scheduled for this day.</div>`;
+        celebrationBanner.classList.add('hidden');
+        habitsPanel.classList.remove('all-habits-complete');
+        return;
+      }
+
+      let allDone = activeHabits.length > 0;
+
+      activeHabits.forEach(habit => {
+        const log = db.logs[currentDate].habits[habit.id] || { actualMins: 0, done: false };
+        if (!log.done) allDone = false;
+        
+        const pct = Math.min(100, Math.round((log.actualMins / habit.targetMins) * 100));
+
+        const card = document.createElement('div');
+        card.className = 'habit-item';
+        card.innerHTML = `
+          <div class="habit-top-line">
+            <div>
+              <span class="habit-name">${habit.name}</span>
+              <span class="habit-schedule-tag">${habit.schedule || 'everyday'}</span>
+              ${habit.startDate ? `<span class="habit-date-tag">From ${habit.startDate}</span>` : ''}
+            </div>
+            <span class="habit-mins-sub">${log.actualMins}m logged of ${habit.targetMins}m target</span>
+          </div>
+          <div class="habit-bottom-line">
+            <div class="habit-progress-bar">
+              <div class="habit-progress-fill" style="width: ${pct}%"></div>
+            </div>
+            <div class="habit-actions-inline">
+              <span>Actual</span>
+              <input type="number" value="${log.actualMins}" onchange="updateHabitLog('${habit.id}', 'actualMins', this.value)">
+              <label class="checkbox-done">
+                <input type="checkbox" ${log.done ? 'checked' : ''} onchange="updateHabitLog('${habit.id}', 'done', this.checked)"> Done
+              </label>
+              <button onclick="openEditHabitModal('${habit.id}')">Edit</button>
+              <button onclick="deleteHabit('${habit.id}')">Del</button>
+            </div>
+          </div>
+        `;
+        container.appendChild(card);
+      });
+
+      if (allDone) {
+        celebrationBanner.classList.remove('hidden');
+        habitsPanel.classList.add('all-habits-complete');
+      } else {
+        celebrationBanner.classList.add('hidden');
+        habitsPanel.classList.remove('all-habits-complete');
+      }
+    }
+
+    function renderTasksAndOverdue() {
+      const overdueContainer = document.getElementById('overdueTasksContainer');
+      const todayContainer = document.getElementById('todayTasksContainer');
+      const overdueSection = document.getElementById('overdueSection');
+      const badge = document.getElementById('inlineOverdueBadge');
+      
+      overdueContainer.innerHTML = '';
+      todayContainer.innerHTML = '';
+
+      let overdueCount = 0;
+
+      const overdueTasks = [];
+      Object.keys(db.logs).forEach(dateStr => {
+        if (dateStr < currentDate) {
+          db.logs[dateStr].tasks.forEach(task => {
+            if (!task.completed) {
+              overdueCount++;
+              const daysOverdue = calculateDaysOverdue(task.createdDate, currentDate);
+              overdueTasks.push({ task, originDateStr: dateStr, daysOverdue });
+            }
+          });
+        }
+      });
+
+      overdueTasks.forEach(({ task, originDateStr, daysOverdue }) => {
+        overdueContainer.appendChild(createTaskCard(task, originDateStr, true, daysOverdue));
+      });
+
+      if (overdueCount > 0) {
+        badge.classList.remove('hidden');
+        overdueSection.classList.remove('hidden');
+        document.getElementById('overdueBadgeCount').innerText = `${overdueCount} overdue`;
+        document.getElementById('statOverdueVal').innerText = overdueCount;
+      } else {
+        badge.classList.add('hidden');
+        overdueSection.classList.add('hidden');
+        document.getElementById('statOverdueVal').innerText = "0";
+      }
+
+      const currentTasks = db.logs[currentDate].tasks || [];
+      const sortedTasks = [...currentTasks].sort((a, b) => Number(a.completed) - Number(b.completed));
+
+      sortedTasks.forEach(task => {
+        todayContainer.appendChild(createTaskCard(task, currentDate, false, 0));
+      });
+    }
+
+    function createTaskCard(task, originDateStr, isOverdue, daysOverdue) {
+      const card = document.createElement('div');
+      card.className = `task-card ${task.completed ? 'is-completed' : ''}`;
+      card.onclick = () => openViewTaskModal(task.id, originDateStr);
+
+      const formattedPriority = normalizePriority(task.priority);
+      const metaText = isOverdue
+        ? `from ${formatDateDisplay(originDateStr)} · ${daysOverdue}d overdue`
+        : `added ${formatDateDisplay(originDateStr)}${task.dueDate ? ' · due ' + formatDateDisplay(task.dueDate) : ''}`;
+
+      let subtasksHtml = '';
+      if (task.subtasks && task.subtasks.length > 0) {
+        const doneCount = task.subtasks.filter(s => s.done).length;
+        subtasksHtml += `<div class="subtask-mini-list">`;
+        subtasksHtml += `<div style="font-size:10px; color:var(--text-muted); font-weight:600;">Checklist (${doneCount}/${task.subtasks.length}):</div>`;
+        task.subtasks.forEach(st => {
+          subtasksHtml += `<div class="subtask-mini-item ${st.done ? 'done' : ''}">• ${st.title}</div>`;
+        });
+        subtasksHtml += `</div>`;
+      }
+
+      card.innerHTML = `
+        <div class="task-main">
+          <input type="checkbox" ${task.completed ? 'checked' : ''} onclick="toggleTaskComplete('${task.id}', '${originDateStr}', event)">
+          <div class="task-info">
+            <div class="task-title" style="${task.completed ? 'text-decoration: line-through; color: var(--text-muted);' : ''}">
+              ${task.title}
+              <span class="priority-tag priority-${formattedPriority}">${formattedPriority}</span>
+            </div>
+            <div class="task-meta">${metaText}</div>
+            ${task.desc ? `<div class="task-desc-snippet">${task.desc}</div>` : ''}
+            ${subtasksHtml}
+          </div>
+        </div>
+        <div class="task-actions">
+          <button onclick="deleteTask('${task.id}', '${originDateStr}', event)">Del</button>
+        </div>
+      `;
+      return card;
+    }
+
+    function renderStats() {
+      const activeHabits = db.habits.filter(h => isHabitScheduledForDate(h, currentDate));
+      const hLogs = db.logs[currentDate].habits;
+      let habitsDone = 0;
+      let totalMinsLogged = 0;
+      let totalMinsTarget = 0;
+
+      activeHabits.forEach(h => {
+        totalMinsTarget += h.targetMins;
+        if (hLogs[h.id]) {
+          totalMinsLogged += hLogs[h.id].actualMins || 0;
+          if (hLogs[h.id].done) habitsDone++;
+        }
+      });
+
+      const habitPct = activeHabits.length ? Math.round((habitsDone / activeHabits.length) * 100) : 0;
+      document.getElementById('statHabitPct').innerText = `${habitPct}%`;
+      document.getElementById('statHabitSub').innerText = `${habitsDone} of ${activeHabits.length} complete`;
+
+      document.getElementById('statMinsLogged').innerText = `${totalMinsLogged}m`;
+      document.getElementById('statMinsSub').innerText = `${totalMinsTarget}m target`;
+
+      const tasks = db.logs[currentDate].tasks || [];
+      const tasksDone = tasks.filter(t => t.completed).length;
+      const taskPct = tasks.length ? Math.round((tasksDone / tasks.length) * 100) : 0;
+
+      document.getElementById('statTaskPct').innerText = `${taskPct}%`;
+      document.getElementById('statTaskSub').innerText = `${tasksDone} of ${tasks.length} complete`;
+    }
+
+    function renderDayCards(weekDays, containerId) {
+      const container = document.getElementById(containerId);
+      container.innerHTML = '';
+
+      weekDays.forEach(dateStr => {
+        const log = db.logs[dateStr];
+        const activeHabits = db.habits.filter(h => isHabitScheduledForDate(h, dateStr));
+        let habitsDone = 0;
+        let totalTasks = 0;
+        let doneTasks = 0;
+
+        if (log) {
+          habitsDone = activeHabits.filter(h => log.habits[h.id] && log.habits[h.id].done).length;
+          totalTasks = log.tasks ? log.tasks.length : 0;
+          doneTasks = log.tasks ? log.tasks.filter(t => t.completed).length : 0;
+        }
+
+        const hPct = activeHabits.length ? Math.round((habitsDone / activeHabits.length) * 100) : 0;
+        const tPct = totalTasks ? Math.round((doneTasks / totalTasks) * 100) : 0;
+
+        const dayDate = parseLocalDate(dateStr);
+        const dayName = dayDate.toLocaleDateString('en-US', { weekday: 'short' });
+        const dayNum = dayDate.toLocaleDateString('en-US', { day: 'numeric', month: 'short' });
+
+        const dayCard = document.createElement('div');
+        dayCard.className = `day-card ${dateStr === currentDate ? 'selected-day' : ''}`;
+        dayCard.innerHTML = `
+          <div class="day-card-header">${dayName}<br><span style="font-size:10px; color:var(--text-muted); font-weight:normal;">${dayNum}</span></div>
+          <div class="day-card-columns">
+            <div class="day-card-col">
+              <div class="v-bar-track"><div class="v-bar-fill-habit" style="height:${hPct}%"></div></div>
+              <span class="bar-sub-label">${habitsDone}/${activeHabits.length} habits</span>
+            </div>
+            <div class="day-card-col">
+              <div class="v-bar-track"><div class="v-bar-fill-task" style="height:${tPct}%"></div></div>
+              <span class="bar-sub-label">${doneTasks}/${totalTasks} tasks</span>
+            </div>
+          </div>
+        `;
+        container.appendChild(dayCard);
+      });
+    }
+
+    function renderWeeklyView(weekDays) {
+      let totalMinsAllTime = 0;
+      let scheduledHabitCountAllTime = 0;
+      let completedHabitCountAllTime = 0;
+      let totalTasksAllTime = 0;
+      let completedTasksAllTime = 0;
+
+      Object.keys(db.logs).forEach(dateStr => {
+        const log = db.logs[dateStr];
+        const activeHabits = db.habits.filter(h => isHabitScheduledForDate(h, dateStr));
+        
+        activeHabits.forEach(h => {
+          scheduledHabitCountAllTime++;
+          if (log.habits && log.habits[h.id]) {
+            totalMinsAllTime += log.habits[h.id].actualMins || 0;
+            if (log.habits[h.id].done) completedHabitCountAllTime++;
+          }
+        });
+
+        if (log.tasks) {
+          totalTasksAllTime += log.tasks.length;
+          completedTasksAllTime += log.tasks.filter(t => t.completed).length;
+        }
+      });
+
+      const hours = Math.floor(totalMinsAllTime / 60);
+      const mins = totalMinsAllTime % 60;
+      document.getElementById('insightTotalMins').innerText = `${hours}h ${mins}m`;
+
+      const habitRate = scheduledHabitCountAllTime ? Math.round((completedHabitCountAllTime / scheduledHabitCountAllTime) * 100) : 0;
+      document.getElementById('insightHabitConsistency').innerText = `${habitRate}%`;
+
+      const taskRate = totalTasksAllTime ? Math.round((completedTasksAllTime / totalTasksAllTime) * 100) : 0;
+      document.getElementById('insightTaskCompletion').innerText = `${taskRate}%`;
+
+      renderDayCards(weekDays, 'weeklyFullCardsContainer');
+
+      const weekKey = weekDays[0];
+      document.getElementById('weeklyReflectionNotes').value = (db.reflections && db.reflections[weekKey]) || '';
+
+      let totalHabitPctSum = 0;
+      let totalTaskPctSum = 0;
+      let totalMinsLoggedWeek = 0;
+
+      weekDays.forEach(dateStr => {
+        const log = db.logs[dateStr];
+        const activeHabits = db.habits.filter(h => isHabitScheduledForDate(h, dateStr));
+        
+        if (log) {
+          const habitsDone = activeHabits.filter(h => log.habits[h.id] && log.habits[h.id].done).length;
+          totalHabitPctSum += activeHabits.length ? (habitsDone / activeHabits.length) : 0;
+
+          const totalTasks = log.tasks ? log.tasks.length : 0;
+          const doneTasks = log.tasks ? log.tasks.filter(t => t.completed).length : 0;
+          totalTaskPctSum += totalTasks ? (doneTasks / totalTasks) : 0;
+
+          Object.values(log.habits || {}).forEach(h => {
+            totalMinsLoggedWeek += h.actualMins || 0;
+          });
+        }
+      });
+
+      const avgHabitPct = Math.round((totalHabitPctSum / 7) * 100);
+      const avgTaskPct = Math.round((totalTaskPctSum / 7) * 100);
+
+      document.getElementById('weeklySummaryStats').innerText = 
+        `${avgHabitPct}% average habit completion, ${avgTaskPct}% average task completion, ${totalMinsLoggedWeek}m logged this week.`;
+
+      const habitsContainer = document.getElementById('weeklyHabitsBreakdownContainer');
+      habitsContainer.innerHTML = '';
+
+      db.habits.forEach(habit => {
+        let habitMinsWeek = 0;
+        let scheduledDaysCount = 0;
+
+        weekDays.forEach(dateStr => {
+          if (isHabitScheduledForDate(habit, dateStr)) {
+            scheduledDaysCount++;
+            const log = db.logs[dateStr];
+            if (log && log.habits && log.habits[habit.id]) {
+              habitMinsWeek += log.habits[habit.id].actualMins || 0;
+            }
+          }
+        });
+
+        const weeklyTargetMins = habit.targetMins * (scheduledDaysCount || 1);
+        const weeklyPct = Math.min(100, Math.round((habitMinsWeek / weeklyTargetMins) * 100));
+
+        let streak = 0;
+        const dates = Object.keys(db.logs).sort().reverse();
+        let countingStreak = true;
+
+        dates.forEach(dateStr => {
+          if (isHabitScheduledForDate(habit, dateStr)) {
+            const hLog = db.logs[dateStr].habits[habit.id];
+            if (hLog && hLog.done) {
+              if (countingStreak) streak++;
+            } else if (dateStr < currentDate) {
+              countingStreak = false;
+            }
+          }
+        });
+
+        const row = document.createElement('div');
+        row.style.background = '#0d1217';
+        row.style.border = '1px solid var(--panel-border)';
+        row.style.padding = '8px 12px';
+        row.style.borderRadius = '4px';
+        row.innerHTML = `
+          <div style="display:flex; justify-content:space-between; font-size:13px; font-weight:600;">
+            <span>${habit.name} <span class="habit-schedule-tag">${habit.schedule || 'everyday'}</span></span>
+            <span style="color: var(--pastel-mint);">🔥 ${streak}d streak · ${weeklyPct}%</span>
+          </div>
+          <div style="font-size:11px; color:var(--text-muted); margin: 2px 0 4px 0;">${habitMinsWeek}m of ${weeklyTargetMins}m this week (${scheduledDaysCount} scheduled days)</div>
+          <div class="habit-progress-bar">
+            <div class="habit-progress-fill" style="width: ${weeklyPct}%"></div>
+          </div>
+        `;
+        habitsContainer.appendChild(row);
+      });
+    }
+
+    function renderMonthlyView() {
+      const selectedMonthKey = currentDate.slice(0, 7); // YYYY-MM
+      const selectedDateObj = parseLocalDate(currentDate);
+      const monthName = selectedDateObj.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+
+      document.getElementById('monthlyTitleDisplay').innerText = `Monthly Overview — ${monthName}`;
+
+      let monthTotalMins = 0;
+      let monthScheduledHabits = 0;
+      let monthCompletedHabits = 0;
+      let monthTasksDoneCount = 0;
+
+      Object.keys(db.logs).forEach(dateStr => {
+        if (dateStr.startsWith(selectedMonthKey)) {
+          const log = db.logs[dateStr];
+          const activeHabits = db.habits.filter(h => isHabitScheduledForDate(h, dateStr));
+
+          activeHabits.forEach(h => {
+            monthScheduledHabits++;
+            if (log.habits && log.habits[h.id]) {
+              monthTotalMins += log.habits[h.id].actualMins || 0;
+              if (log.habits[h.id].done) monthCompletedHabits++;
+            }
+          });
+
+          if (log.tasks) {
+            monthTasksDoneCount += log.tasks.filter(t => t.completed).length;
+          }
+        }
+      });
+
+      const hours = Math.floor(monthTotalMins / 60);
+      const mins = monthTotalMins % 60;
+      document.getElementById('monthTotalHours').innerText = `${hours}h ${mins}m`;
+
+      const habitRate = monthScheduledHabits ? Math.round((monthCompletedHabits / monthScheduledHabits) * 100) : 0;
+      document.getElementById('monthHabitPct').innerText = `${habitRate}%`;
+      document.getElementById('monthTasksDone').innerText = monthTasksDoneCount;
+
+      const monthlyHabitsContainer = document.getElementById('monthlyHabitsContainer');
+      monthlyHabitsContainer.innerHTML = '';
+
+      db.habits.forEach(habit => {
+        let habitMinsMonth = 0;
+        let habitDaysCount = 0;
+
+        Object.keys(db.logs).forEach(dateStr => {
+          if (dateStr.startsWith(selectedMonthKey) && isHabitScheduledForDate(habit, dateStr)) {
+            habitDaysCount++;
+            const log = db.logs[dateStr];
+            if (log && log.habits && log.habits[habit.id]) {
+              habitMinsMonth += log.habits[habit.id].actualMins || 0;
+            }
+          }
+        });
+
+        const targetMinsMonth = habit.targetMins * (habitDaysCount || 1);
+        const monthPct = Math.min(100, Math.round((habitMinsMonth / targetMinsMonth) * 100));
+
+        const row = document.createElement('div');
+        row.style.background = '#0d1217';
+        row.style.border = '1px solid var(--panel-border)';
+        row.style.padding = '8px 12px';
+        row.style.borderRadius = '4px';
+        row.innerHTML = `
+          <div style="display:flex; justify-content:space-between; font-size:13px; font-weight:600;">
+            <span>${habit.name} <span class="habit-schedule-tag">${habit.schedule || 'everyday'}</span></span>
+            <span style="color: var(--pastel-sky);">${monthPct}%</span>
+          </div>
+          <div style="font-size:11px; color:var(--text-muted); margin: 2px 0 4px 0;">${habitMinsMonth}m of ${targetMinsMonth}m logged this month (${habitDaysCount} active days)</div>
+          <div class="habit-progress-bar">
+            <div class="habit-progress-fill" style="width: ${monthPct}%"></div>
+          </div>
+        `;
+        monthlyHabitsContainer.appendChild(row);
+      });
+    }
+
+    // --- Navigation Listeners ---
+    document.getElementById('datePicker').addEventListener('change', (e) => {
+      if (e.target.value) {
+        currentDate = e.target.value;
+        render();
+      }
+    });
+
+    document.getElementById('btnToday').addEventListener('click', () => {
+      currentDate = getFormattedDate(new Date());
+      render();
+    });
+
+    document.getElementById('btnPrevDay').addEventListener('click', () => {
+      const d = parseLocalDate(currentDate);
+      d.setDate(d.getDate() - 1);
+      currentDate = getFormattedDate(d);
+      render();
+    });
+
+    document.getElementById('btnNextDay').addEventListener('click', () => {
+      const d = parseLocalDate(currentDate);
+      d.setDate(d.getDate() + 1);
+      currentDate = getFormattedDate(d);
+      render();
+    });
+
+    // Initial Render
+    render();
+  </script>
+</body>
+</html>
