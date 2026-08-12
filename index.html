@@ -13,7 +13,8 @@
     :root {
       --bg-dark: #090d12;
       --panel-bg: #12181f;
-      --panel-border: #1e2631;
+      --card-bg: #18222d;
+      --panel-border: #263345;
       --text-main: #e2e8f0;
       --text-muted: #94a3b8;
 
@@ -34,6 +35,10 @@
     /* Mobile Header Toggle Bar */
     .mobile-header { display: none; background-color: var(--panel-bg); border-bottom: 1px solid var(--panel-border); padding: 10px 14px; justify-content: space-between; align-items: center; width: 100%; z-index: 10; }
     .mobile-toggle-btn { background: #1c232d; border: 1px solid var(--panel-border); color: var(--text-main); padding: 6px 12px; border-radius: 4px; font-size: 14px; }
+
+    /* Mobile Menu Backdrop */
+    .menu-backdrop { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.6); z-index: 98; display: none; }
+    .menu-backdrop.active { display: block; }
 
     /* Sidebar */
     aside { width: 210px; background-color: var(--panel-bg); border-right: 1px solid var(--panel-border); padding: 12px 10px; display: flex; flex-direction: column; gap: 8px; flex-shrink: 0; transition: transform 0.3s ease; }
@@ -74,13 +79,13 @@
     .left-column { display: flex; flex-direction: column; gap: 10px; }
     
     .stats-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; width: 100%; }
-    .stat-card { background: var(--panel-bg); border: 1px solid var(--panel-border); padding: 8px 10px; border-radius: 6px; }
+    .stat-card { background: var(--card-bg); border: 1px solid var(--panel-border); padding: 8px 10px; border-radius: 6px; }
     .stat-card .label { font-size: 11px; color: var(--text-muted); white-space: nowrap; }
     .stat-card .val { font-size: 18px; font-weight: bold; margin: 1px 0; color: #f8fafc; }
     .stat-card .sub { font-size: 10px; color: var(--text-muted); white-space: nowrap; }
 
     .insights-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
-    .insight-card { background: #0d1217; border: 1px solid var(--panel-border); padding: 10px; border-radius: 6px; display: flex; flex-direction: column; gap: 2px; }
+    .insight-card { background: var(--card-bg); border: 1px solid var(--panel-border); padding: 10px; border-radius: 6px; display: flex; flex-direction: column; gap: 2px; }
     .insight-card .title { font-size: 11px; color: var(--text-muted); font-weight: 600; }
     .insight-card .big-val { font-size: 20px; font-weight: bold; color: var(--pastel-sky); }
     .insight-card .desc { font-size: 10px; color: var(--text-main); }
@@ -91,55 +96,56 @@
     .panel-header h2 { font-size: 14px; font-weight: 600; color: #f8fafc; }
     .panel-sub { font-size: 11px; color: var(--text-muted); margin-top: -4px; margin-bottom: 2px; }
 
-    .habit-item { background: #0d1217; border: 1px solid var(--panel-border); padding: 8px 10px; border-radius: 4px; display: flex; flex-direction: column; gap: 6px; }
+    /* Habit Card Styling */
+    .habit-item { background: var(--card-bg); border: 1px solid var(--panel-border); padding: 10px 12px; border-radius: 6px; display: flex; flex-direction: column; gap: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
     .habit-top-line { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 4px; }
     .habit-name { font-weight: 600; font-size: 13px; color: #f8fafc; }
-    .habit-schedule-tag { font-size: 10px; color: var(--pastel-sky); background: rgba(186, 230, 253, 0.1); padding: 0px 4px; border-radius: 3px; font-weight: 500; margin-left: 4px; }
-    .habit-date-tag { font-size: 10px; color: var(--text-muted); background: #1c232d; padding: 0px 4px; border-radius: 3px; margin-left: 4px; }
+    .habit-schedule-tag { font-size: 10px; color: var(--pastel-sky); background: rgba(186, 230, 253, 0.1); padding: 1px 5px; border-radius: 3px; font-weight: 500; margin-left: 4px; }
+    .habit-date-tag { font-size: 10px; color: var(--text-muted); background: #1c232d; padding: 1px 5px; border-radius: 3px; margin-left: 4px; }
     .habit-mins-sub { font-size: 11px; color: var(--text-muted); }
     
-    .habit-bottom-line { display: flex; align-items: center; gap: 8px; margin-top: 1px; flex-wrap: wrap; }
-    .habit-progress-bar { flex: 1; min-width: 100px; height: 6px; background: #1c232d; border-radius: 3px; overflow: hidden; }
+    .habit-progress-bar { width: 100%; height: 6px; background: #12181f; border-radius: 3px; overflow: hidden; }
     .habit-progress-fill { height: 100%; background: linear-gradient(90deg, var(--pastel-sky), var(--pastel-mint)); width: 0%; transition: width 0.3s ease; }
-    
-    .habit-actions-inline { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--text-muted); flex-wrap: wrap; }
-    .habit-actions-inline input[type="number"] { width: 48px; text-align: center; padding: 3px; height: 26px; }
+
+    .habit-bottom-line { display: flex; justify-content: flex-end; align-items: center; gap: 8px; margin-top: 2px; flex-wrap: wrap; }
+    .habit-actions-inline { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--text-muted); }
+    .habit-actions-inline input[type="number"] { width: 52px; text-align: center; padding: 4px; height: 26px; }
     .checkbox-done { display: flex; align-items: center; gap: 4px; cursor: pointer; user-select: none; }
     .checkbox-done input { cursor: pointer; accent-color: var(--pastel-mint); width: 16px; height: 16px; }
 
-    .task-group { display: flex; flex-direction: column; gap: 6px; }
-    .task-group-title { font-size: 12px; font-weight: 600; color: var(--text-muted); border-bottom: 1px solid var(--panel-border); padding-bottom: 2px; }
+    .task-group { display: flex; flex-direction: column; gap: 8px; }
+    .task-group-title { font-size: 12px; font-weight: 600; color: var(--text-muted); border-bottom: 1px solid var(--panel-border); padding-bottom: 4px; }
     
-    .task-card { background: #0d1217; border: 1px solid var(--panel-border); padding: 8px 10px; border-radius: 4px; display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; cursor: pointer; transition: border-color 0.15s, opacity 0.2s; }
+    .task-card { background: var(--card-bg); border: 1px solid var(--panel-border); padding: 10px 12px; border-radius: 6px; display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; cursor: pointer; transition: border-color 0.15s, opacity 0.2s; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
     .task-card:hover { border-color: var(--text-muted); }
-    .task-card.is-completed { opacity: 0.55; }
+    .task-card.is-completed { opacity: 0.5; }
     
     .task-main { display: flex; gap: 8px; flex: 1; }
     .task-main input[type="checkbox"] { margin-top: 2px; cursor: pointer; accent-color: var(--pastel-mint); width: 16px; height: 16px; }
-    .task-info { display: flex; flex-direction: column; gap: 2px; width: 100%; }
+    .task-info { display: flex; flex-direction: column; gap: 3px; width: 100%; }
     .task-title { font-size: 13px; font-weight: 600; color: #f8fafc; }
     .task-meta { font-size: 11px; color: var(--text-muted); }
-    .task-desc-snippet { font-size: 11px; color: var(--text-main); margin-top: 1px; white-space: pre-wrap; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+    .task-desc-snippet { font-size: 11px; color: var(--text-main); margin-top: 2px; white-space: pre-wrap; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
     
-    .subtask-mini-list { margin-top: 4px; display: flex; flex-direction: column; gap: 2px; }
+    .subtask-mini-list { margin-top: 6px; display: flex; flex-direction: column; gap: 3px; background: #12181f; padding: 6px 8px; border-radius: 4px; border: 1px solid var(--panel-border); }
     .subtask-mini-item { font-size: 11px; display: flex; align-items: center; gap: 4px; color: var(--text-muted); }
     .subtask-mini-item.done { text-decoration: line-through; opacity: 0.6; }
 
     .task-actions { display: flex; gap: 4px; flex-shrink: 0; }
 
-    .priority-tag { font-size: 9px; padding: 1px 4px; border-radius: 3px; text-transform: uppercase; font-weight: bold; }
+    .priority-tag { font-size: 9px; padding: 1px 5px; border-radius: 3px; text-transform: uppercase; font-weight: bold; }
     .priority-High { background: rgba(254, 205, 211, 0.15); color: var(--pastel-rose); }
     .priority-Medium { background: rgba(254, 243, 199, 0.15); color: var(--pastel-amber); }
     .priority-Low { background: rgba(186, 230, 253, 0.15); color: var(--pastel-sky); }
 
     .weekly-cards-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
-    .day-card { background: #0d1217; border: 1px solid var(--panel-border); padding: 8px 6px; border-radius: 4px; font-size: 11px; display: flex; flex-direction: column; gap: 4px; }
+    .day-card { background: var(--card-bg); border: 1px solid var(--panel-border); padding: 8px 6px; border-radius: 4px; font-size: 11px; display: flex; flex-direction: column; gap: 4px; }
     .day-card.selected-day { border-color: var(--pastel-mint); }
     .day-card-header { font-weight: 600; color: var(--text-main); font-size: 12px; }
     
     .day-card-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; align-items: end; margin-top: 2px; }
     .day-card-col { display: flex; flex-direction: column; gap: 2px; align-items: flex-start; }
-    .v-bar-track { width: 100%; height: 26px; background: #1c232d; border-radius: 2px; overflow: hidden; display: flex; flex-direction: column; justify-content: flex-end; }
+    .v-bar-track { width: 100%; height: 26px; background: #12181f; border-radius: 2px; overflow: hidden; display: flex; flex-direction: column; justify-content: flex-end; }
     .v-bar-fill-habit { width: 100%; background: linear-gradient(0deg, var(--pastel-sky), var(--pastel-mint)); transition: height 0.3s ease; }
     .v-bar-fill-task { width: 100%; background: var(--pastel-lavender); transition: height 0.3s ease; }
     .bar-sub-label { font-size: 10px; color: var(--text-muted); white-space: nowrap; }
@@ -158,7 +164,7 @@
       aside { position: fixed; top: 0; left: 0; height: 100vh; width: 250px; z-index: 99; transform: translateX(-100%); box-shadow: 5px 0 15px rgba(0,0,0,0.5); }
       aside.mobile-open { transform: translateX(0); }
       main { padding: 10px; }
-      .workspace { grid-template-columns: 1fr; gap: 10px; }
+      .workspace { grid-template-columns: 1fr; gap: 12px; }
       .stats-grid { grid-template-columns: repeat(2, 1fr); }
       .insights-grid { grid-template-columns: 1fr; }
       .weekly-cards-grid { grid-template-columns: repeat(2, 1fr); }
@@ -175,6 +181,9 @@
     <div class="brand"><span class="brand-icon">HT</span> Habit Tracker</div>
     <button class="mobile-toggle-btn" onclick="toggleMobileSidebar()">☰ Menu</button>
   </div>
+
+  <!-- Menu Backdrop -->
+  <div id="menuBackdrop" class="menu-backdrop" onclick="toggleMobileSidebar()"></div>
 
   <!-- Sidebar -->
   <aside id="sidebar">
@@ -257,7 +266,7 @@
               <h2>Daily habits</h2>
             </div>
             <p class="panel-sub">Log actual minutes. A habit counts complete when it reaches target or is checked done.</p>
-            <div id="habitsContainer" style="display:flex; flex-direction:column; gap:6px;"></div>
+            <div id="habitsContainer" style="display:flex; flex-direction:column; gap:8px;"></div>
           </div>
         </div>
 
@@ -272,12 +281,12 @@
 
           <div class="task-group hidden" id="overdueSection">
             <div class="task-group-title" style="color: var(--pastel-rose);">Overdue, carried forward</div>
-            <div id="overdueTasksContainer" style="display:flex; flex-direction:column; gap:6px;"></div>
+            <div id="overdueTasksContainer" style="display:flex; flex-direction:column; gap:8px;"></div>
           </div>
 
           <div class="task-group">
             <div class="task-group-title">Added today</div>
-            <div id="todayTasksContainer" style="display:flex; flex-direction:column; gap:6px;"></div>
+            <div id="todayTasksContainer" style="display:flex; flex-direction:column; gap:8px;"></div>
           </div>
         </div>
       </div>
@@ -555,7 +564,7 @@
       console.warn("Firebase fallback to localStorage.", e);
     }
 
-    const STORAGE_KEY = "habit_tracker_db_v30";
+    const STORAGE_KEY = "habit_tracker_db_v32";
 
     const defaultHabits = [
       { id: 'h1', name: 'PGP in Business & AI', targetMins: 30, schedule: 'everyday', startDate: '2026-08-01' },
@@ -582,7 +591,9 @@
 
     function toggleMobileSidebar() {
       const sidebar = document.getElementById('sidebar');
+      const backdrop = document.getElementById('menuBackdrop');
       sidebar.classList.toggle('mobile-open');
+      backdrop.classList.toggle('active');
     }
 
     if (isFirebaseActive) {
@@ -687,8 +698,10 @@
       document.getElementById('viewMonthly').classList.toggle('hidden', view !== 'monthly');
 
       const sidebar = document.getElementById('sidebar');
+      const backdrop = document.getElementById('menuBackdrop');
       if (sidebar.classList.contains('mobile-open')) {
         sidebar.classList.remove('mobile-open');
+        backdrop.classList.remove('active');
       }
 
       render();
@@ -1182,10 +1195,10 @@
             </div>
             <span class="habit-mins-sub">${log.actualMins}m logged of ${habit.targetMins}m target</span>
           </div>
+          <div class="habit-progress-bar">
+            <div class="habit-progress-fill" style="width: ${pct}%"></div>
+          </div>
           <div class="habit-bottom-line">
-            <div class="habit-progress-bar">
-              <div class="habit-progress-fill" style="width: ${pct}%"></div>
-            </div>
             <div class="habit-actions-inline">
               <span>Actual</span>
               <input type="number" value="${log.actualMins}" onchange="updateHabitLog('${habit.id}', 'actualMins', this.value)">
@@ -1474,7 +1487,7 @@
         });
 
         const row = document.createElement('div');
-        row.style.background = '#0d1217';
+        row.style.background = 'var(--card-bg)';
         row.style.border = '1px solid var(--panel-border)';
         row.style.padding = '8px 12px';
         row.style.borderRadius = '4px';
@@ -1552,7 +1565,7 @@
         const monthPct = Math.min(100, Math.round((habitMinsMonth / targetMinsMonth) * 100));
 
         const row = document.createElement('div');
-        row.style.background = '#0d1217';
+        row.style.background = 'var(--card-bg)';
         row.style.border = '1px solid var(--panel-border)';
         row.style.padding = '8px 12px';
         row.style.borderRadius = '4px';
