@@ -552,25 +552,9 @@
     };
 
     let dbRef = null;
-    let isFirebaseActive = false;
-
-    try {
-      if (firebaseConfig.apiKey && firebaseConfig.apiKey !== "YOUR_API_KEY") {
-        firebase.initializeApp(firebaseConfig);
-        dbRef = firebase.database().ref("habit_tracker_db");
-        isFirebaseActive = true;
-      }
-    } catch (e) {
-      console.warn("Firebase fallback to localStorage.", e);
-    }
+    let isFirebaseActive = false; // Forced to false for reliable standalone mobile execution
 
     const STORAGE_KEY = "habit_tracker_db_permanent";
-
-    let db = JSON.parse(localStorage.getItem(STORAGE_KEY)) || {
-      habits: defaultHabits || [],
-      logs: {},
-      reflections: {}
-    };
 
     const defaultHabits = [
       { id: 'h1', name: 'PGP in Business & AI', targetMins: 30, schedule: 'everyday', startDate: '2026-08-01' },
@@ -579,6 +563,12 @@
       { id: 'h4', name: 'Exercise', targetMins: 45, schedule: 'everyday', startDate: '2026-08-01' },
       { id: 'h5', name: 'Strategy', targetMins: 30, schedule: 'everyday', startDate: '2026-08-01' }
     ];
+
+    let db = JSON.parse(localStorage.getItem(STORAGE_KEY)) || {
+      habits: defaultHabits || [],
+      logs: {},
+      reflections: {}
+    };
 
     if (!db.habits || db.habits.length === 0) db.habits = defaultHabits;
     if (!db.logs) db.logs = {};
@@ -594,20 +584,6 @@
       const backdrop = document.getElementById('menuBackdrop');
       sidebar.classList.toggle('mobile-open');
       backdrop.classList.toggle('active');
-    }
-
-    if (isFirebaseActive) {
-      dbRef.on('value', (snapshot) => {
-        const cloudData = snapshot.val();
-        if (cloudData) {
-          db = cloudData;
-          if (!db.habits || db.habits.length === 0) db.habits = defaultHabits;
-          if (!db.logs) db.logs = {};
-          if (!db.reflections) db.reflections = {};
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(db));
-          render();
-        }
-      });
     }
 
     function saveState() {
@@ -1132,7 +1108,6 @@
       if (!db.reflections) db.reflections = {};
       db.reflections[weekKey] = text;
       localStorage.setItem(STORAGE_KEY, JSON.stringify(db));
-      if (isFirebaseActive) dbRef.set(db);
     }
 
     function render() {
