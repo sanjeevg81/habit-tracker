@@ -145,7 +145,7 @@
     .bar-sub-label { font-size: 10px; color: var(--text-muted); white-space: nowrap; }
 
     .modal-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center; z-index: 100; }
-    .modal-box { background: var(--panel-bg); border: 1px solid var(--panel-border); border-radius: 6px; padding: 14px; width: 420px; max-width: 90%; display: flex; flex-direction: column; gap: 10px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
+    .modal-box { background: var(--panel-bg); border: 1px solid var(--panel-border); border-radius: 6px; padding: 14px; width: 460px; max-width: 90%; display: flex; flex-direction: column; gap: 10px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
     .modal-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--panel-border); padding-bottom: 6px; }
     .modal-header h3 { font-size: 15px; font-weight: 600; color: #f8fafc; }
     .modal-close { background: transparent; border: none; color: var(--text-muted); font-size: 16px; cursor: pointer; }
@@ -397,7 +397,7 @@
         <label style="font-size: 11px; color: var(--text-muted); display: block; margin-bottom: 4px;">Sub-Task Checklist</label>
         <div id="modalSubtasksContainer" style="display:flex; flex-direction:column; gap:4px; margin-bottom:6px;"></div>
         <div style="display:flex; gap:6px;">
-          <input type="text" id="modalSubtaskInput" placeholder="Add a sub-task step..." style="flex:1;">
+          <input type="text" id="modalSubtaskInput" placeholder="Add a sub-task step..." style="flex:1;" onkeypress="if(event.key==='Enter'){addModalSubtask(); event.preventDefault();}">
           <button onclick="addModalSubtask()">+ Add Step</button>
         </div>
       </div>
@@ -476,10 +476,10 @@
       </div>
 
       <div>
-        <label style="font-size: 11px; color: var(--text-muted); display: block; margin-bottom: 4px;">Sub-Task Steps</label>
-        <div id="editSubtasksContainer" style="display:flex; flex-direction:column; gap:4px; margin-bottom:6px;"></div>
+        <label style="font-size: 11px; color: var(--text-muted); display: block; margin-bottom: 4px;">Sub-Task Steps (Edit & Reorder)</label>
+        <div id="editSubtasksContainer" style="display:flex; flex-direction:column; gap:6px; margin-bottom:6px; max-height: 200px; overflow-y: auto;"></div>
         <div style="display:flex; gap:6px;">
-          <input type="text" id="editSubtaskInput" placeholder="Add another step..." style="flex:1;">
+          <input type="text" id="editSubtaskInput" placeholder="Add another step..." style="flex:1;" onkeypress="if(event.key==='Enter'){addEditSubtask(); event.preventDefault();}">
           <button onclick="addEditSubtask()">+ Add Step</button>
         </div>
       </div>
@@ -555,7 +555,7 @@
       console.warn("Firebase fallback to localStorage.", e);
     }
 
-    const STORAGE_KEY = "habit_tracker_db_v29";
+    const STORAGE_KEY = "habit_tracker_db_v30";
 
     const defaultHabits = [
       { id: 'h1', name: 'PGP in Business & AI', targetMins: 30, schedule: 'everyday', startDate: '2026-08-01' },
@@ -695,7 +695,6 @@
     }
 
     function ensureDateStructure(dateStr) {
-      if (!db.logs) db.logs = {};
       if (!db.logs[dateStr]) {
         db.logs[dateStr] = { habits: {}, tasks: [] };
       }
@@ -742,7 +741,7 @@
     function exportTasksToCSV() {
       let csvContent = "data:text/csv;charset=utf-8,Title,Description,Priority,CreatedDate,DueDate,Completed\n";
       
-      Object.keys(db.logs || {}).forEach(dateStr => {
+      Object.keys(db.logs).forEach(dateStr => {
         (db.logs[dateStr].tasks || []).forEach(task => {
           const title = `"${(task.title || '').replace(/"/g, '""')}"`;
           const desc = `"${(task.desc || '').replace(/"/g, '""')}"`;
@@ -789,7 +788,6 @@
           const line = lines[i].trim();
           if (!line) continue;
 
-          // Simple CSV splitter fallback if regex matches nothing
           let parts = line.match(/(?:[^\",]+|\"[^\"]*\")+/g);
           if (!parts) {
             parts = line.split(',');
@@ -925,9 +923,12 @@
         item.style.justifyContent = 'space-between';
         item.style.alignItems = 'center';
         item.style.fontSize = '12px';
+        item.style.gap = '6px';
         item.innerHTML = `
-          <span>• ${st.title}</span>
-          <button style="font-size:10px;" onclick="removeModalSubtask(${idx})">Del</button>
+          <input type="text" value="${st.title.replace(/"/g, '&quot;')}" oninput="currentModalSubtasks[${idx}].title = this.value" style="flex:1;">
+          <button style="font-size:10px; padding:2px 5px;" onclick="moveModalSubtask(${idx}, -1)" ${idx === 0 ? 'disabled style="opacity:0.4;"' : ''}>↑</button>
+          <button style="font-size:10px; padding:2px 5px;" onclick="moveModalSubtask(${idx}, 1)" ${idx === currentModalSubtasks.length - 1 ? 'disabled style="opacity:0.4;"' : ''}>↓</button>
+          <button style="font-size:10px; color:var(--pastel-rose);" onclick="removeModalSubtask(${idx})">Del</button>
         `;
         container.appendChild(item);
       });
@@ -941,6 +942,14 @@
         input.value = '';
         renderModalSubtasks();
       }
+    }
+
+    function moveModalSubtask(idx, direction) {
+      const newIdx = idx + direction;
+      if (newIdx < 0 || newIdx >= currentModalSubtasks.length) return;
+      const item = currentModalSubtasks.splice(idx, 1)[0];
+      currentModalSubtasks.splice(newIdx, 0, item);
+      renderModalSubtasks();
     }
 
     function removeModalSubtask(idx) {
@@ -967,14 +976,11 @@
       const title = document.getElementById('modalTaskTitle').value.trim();
       const desc = document.getElementById('modalTaskDesc').value.trim();
       const priority = normalizePriority(document.getElementById('modalTaskPriority').value);
-      
-      let rawDueDate = document.getElementById('modalTaskDueDate').value;
-      const dueDate = rawDueDate ? getFormattedDate(parseLocalDate(rawDueDate)) : currentDate;
+      const dueDate = document.getElementById('modalTaskDueDate').value || currentDate;
 
       if (!title) return;
 
       ensureDateStructure(currentDate);
-
       db.logs[currentDate].tasks.push({
         id: 't_' + Date.now(),
         title,
@@ -996,15 +1002,15 @@
       currentEditingSubtasks.forEach((st, idx) => {
         const item = document.createElement('div');
         item.style.display = 'flex';
-        item.style.justifyContent = 'space-between';
         item.style.alignItems = 'center';
+        item.style.gap = '6px';
         item.style.fontSize = '12px';
         item.innerHTML = `
-          <label style="display:flex; align-items:center; gap:6px; cursor:pointer;">
-            <input type="checkbox" ${st.done ? 'checked' : ''} onchange="toggleEditSubtask(${idx}, this.checked)">
-            <span style="${st.done ? 'text-decoration:line-through; color:var(--text-muted);' : ''}">${st.title}</span>
-          </label>
-          <button style="font-size:10px;" onclick="removeEditSubtask(${idx})">Del</button>
+          <input type="checkbox" ${st.done ? 'checked' : ''} onchange="toggleEditSubtask(${idx}, this.checked)" title="Mark completed">
+          <input type="text" value="${st.title.replace(/"/g, '&quot;')}" oninput="currentEditingSubtasks[${idx}].title = this.value" style="flex:1;">
+          <button style="font-size:10px; padding:2px 5px;" onclick="moveEditSubtask(${idx}, -1)" ${idx === 0 ? 'disabled style="opacity:0.4;"' : ''}>↑</button>
+          <button style="font-size:10px; padding:2px 5px;" onclick="moveEditSubtask(${idx}, 1)" ${idx === currentEditingSubtasks.length - 1 ? 'disabled style="opacity:0.4;"' : ''}>↓</button>
+          <button style="font-size:10px; color:var(--pastel-rose);" onclick="removeEditSubtask(${idx})">Del</button>
         `;
         container.appendChild(item);
       });
@@ -1012,7 +1018,6 @@
 
     function toggleEditSubtask(idx, done) {
       currentEditingSubtasks[idx].done = done;
-      renderEditSubtasks();
     }
 
     function addEditSubtask() {
@@ -1025,13 +1030,20 @@
       }
     }
 
+    function moveEditSubtask(idx, direction) {
+      const newIdx = idx + direction;
+      if (newIdx < 0 || newIdx >= currentEditingSubtasks.length) return;
+      const item = currentEditingSubtasks.splice(idx, 1)[0];
+      currentEditingSubtasks.splice(newIdx, 0, item);
+      renderEditSubtasks();
+    }
+
     function removeEditSubtask(idx) {
       currentEditingSubtasks.splice(idx, 1);
       renderEditSubtasks();
     }
 
     function openViewTaskModal(taskId, originDateStr) {
-      ensureDateStructure(originDateStr);
       const task = db.logs[originDateStr].tasks.find(t => t.id === taskId);
       if (!task) return;
 
@@ -1068,14 +1080,10 @@
       const taskId = document.getElementById('editTaskId').value;
       const originDateStr = document.getElementById('editTaskOriginDate').value;
 
-      ensureDateStructure(originDateStr);
       const task = db.logs[originDateStr].tasks.find(t => t.id === taskId);
       if (task) {
         task.priority = normalizePriority(document.getElementById('editTaskPriority').value);
-        
-        let rawDueDate = document.getElementById('editTaskDueDate').value;
-        task.dueDate = rawDueDate ? getFormattedDate(parseLocalDate(rawDueDate)) : originDateStr;
-        
+        task.dueDate = document.getElementById('editTaskDueDate').value;
         task.desc = document.getElementById('editTaskDesc').value.trim();
         task.subtasks = currentEditingSubtasks;
         closeViewTaskModal();
@@ -1085,7 +1093,6 @@
 
     function toggleTaskComplete(taskId, originDateStr, event) {
       event.stopPropagation();
-      ensureDateStructure(originDateStr);
       const task = db.logs[originDateStr].tasks.find(t => t.id === taskId);
       if (task) {
         task.completed = !task.completed;
@@ -1095,7 +1102,6 @@
 
     function deleteTask(taskId, originDateStr, event) {
       if (event) event.stopPropagation();
-      ensureDateStructure(originDateStr);
       db.logs[originDateStr].tasks = db.logs[originDateStr].tasks.filter(t => t.id !== taskId);
       saveState();
     }
@@ -1107,7 +1113,7 @@
       if (!db.reflections) db.reflections = {};
       db.reflections[weekKey] = text;
       localStorage.setItem(STORAGE_KEY, JSON.stringify(db));
-      if (isFirebaseActive && dbRef) dbRef.set(db);
+      if (isFirebaseActive) dbRef.set(db);
     }
 
     function render() {
@@ -1215,9 +1221,9 @@
       let overdueCount = 0;
 
       const overdueTasks = [];
-      Object.keys(db.logs || {}).forEach(dateStr => {
+      Object.keys(db.logs).forEach(dateStr => {
         if (dateStr < currentDate) {
-          (db.logs[dateStr].tasks || []).forEach(task => {
+          db.logs[dateStr].tasks.forEach(task => {
             if (!task.completed) {
               overdueCount++;
               const daysOverdue = calculateDaysOverdue(task.createdDate, currentDate);
@@ -1242,7 +1248,7 @@
         document.getElementById('statOverdueVal').innerText = "0";
       }
 
-      const currentTasks = db.logs[currentDate]?.tasks || [];
+      const currentTasks = db.logs[currentDate].tasks || [];
       const sortedTasks = [...currentTasks].sort((a, b) => Number(a.completed) - Number(b.completed));
 
       sortedTasks.forEach(task => {
@@ -1293,7 +1299,7 @@
 
     function renderStats() {
       const activeHabits = db.habits.filter(h => isHabitScheduledForDate(h, currentDate));
-      const hLogs = db.logs[currentDate]?.habits || {};
+      const hLogs = db.logs[currentDate].habits;
       let habitsDone = 0;
       let totalMinsLogged = 0;
       let totalMinsTarget = 0;
@@ -1313,7 +1319,7 @@
       document.getElementById('statMinsLogged').innerText = `${totalMinsLogged}m`;
       document.getElementById('statMinsSub').innerText = `${totalMinsTarget}m target`;
 
-      const tasks = db.logs[currentDate]?.tasks || [];
+      const tasks = db.logs[currentDate].tasks || [];
       const tasksDone = tasks.filter(t => t.completed).length;
       const taskPct = tasks.length ? Math.round((tasksDone / tasks.length) * 100) : 0;
 
@@ -1333,7 +1339,7 @@
         let doneTasks = 0;
 
         if (log) {
-          habitsDone = activeHabits.filter(h => log.habits && log.habits[h.id] && log.habits[h.id].done).length;
+          habitsDone = activeHabits.filter(h => log.habits[h.id] && log.habits[h.id].done).length;
           totalTasks = log.tasks ? log.tasks.length : 0;
           doneTasks = log.tasks ? log.tasks.filter(t => t.completed).length : 0;
         }
@@ -1371,7 +1377,7 @@
       let totalTasksAllTime = 0;
       let completedTasksAllTime = 0;
 
-      Object.keys(db.logs || {}).forEach(dateStr => {
+      Object.keys(db.logs).forEach(dateStr => {
         const log = db.logs[dateStr];
         const activeHabits = db.habits.filter(h => isHabitScheduledForDate(h, dateStr));
         
@@ -1413,7 +1419,7 @@
         const activeHabits = db.habits.filter(h => isHabitScheduledForDate(h, dateStr));
         
         if (log) {
-          const habitsDone = activeHabits.filter(h => log.habits && log.habits[h.id] && log.habits[h.id].done).length;
+          const habitsDone = activeHabits.filter(h => log.habits[h.id] && log.habits[h.id].done).length;
           totalHabitPctSum += activeHabits.length ? (habitsDone / activeHabits.length) : 0;
 
           const totalTasks = log.tasks ? log.tasks.length : 0;
@@ -1453,12 +1459,12 @@
         const weeklyPct = Math.min(100, Math.round((habitMinsWeek / weeklyTargetMins) * 100));
 
         let streak = 0;
-        const dates = Object.keys(db.logs || {}).sort().reverse();
+        const dates = Object.keys(db.logs).sort().reverse();
         let countingStreak = true;
 
         dates.forEach(dateStr => {
           if (isHabitScheduledForDate(habit, dateStr)) {
-            const hLog = db.logs[dateStr]?.habits?.[habit.id];
+            const hLog = db.logs[dateStr].habits[habit.id];
             if (hLog && hLog.done) {
               if (countingStreak) streak++;
             } else if (dateStr < currentDate) {
@@ -1498,7 +1504,7 @@
       let monthCompletedHabits = 0;
       let monthTasksDoneCount = 0;
 
-      Object.keys(db.logs || {}).forEach(dateStr => {
+      Object.keys(db.logs).forEach(dateStr => {
         if (dateStr.startsWith(selectedMonthKey)) {
           const log = db.logs[dateStr];
           const activeHabits = db.habits.filter(h => isHabitScheduledForDate(h, dateStr));
@@ -1532,7 +1538,7 @@
         let habitMinsMonth = 0;
         let habitDaysCount = 0;
 
-        Object.keys(db.logs || {}).forEach(dateStr => {
+        Object.keys(db.logs).forEach(dateStr => {
           if (dateStr.startsWith(selectedMonthKey) && isHabitScheduledForDate(habit, dateStr)) {
             habitDaysCount++;
             const log = db.logs[dateStr];
