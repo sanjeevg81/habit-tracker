@@ -66,8 +66,8 @@
     
     button { background-color: #1c232d; border: 1px solid var(--panel-border); color: var(--text-main); padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 12px; }
     button:hover { border-color: var(--text-muted); }
-    button.btn-cyan { background-color: var(--pastel-sky-dark); border-color: transparent; color: var(--pastel-sky); font-weight: 500; }
     button.btn-cyan:hover { background-color: #0284c7; }
+    button.btn-cyan { background-color: var(--pastel-sky-dark); border-color: transparent; color: var(--pastel-sky); font-weight: 500; }
     input, textarea, select { background-color: #090d12; border: 1px solid var(--panel-border); color: var(--text-main); padding: 5px 8px; border-radius: 4px; font-size: 12px; }
     input:focus, textarea:focus, select:focus { outline: none; border-color: var(--pastel-sky); }
 
@@ -1079,7 +1079,7 @@
       renderEditSubtasks();
 
       document.getElementById('viewTaskMeta').innerText = 
-        `Added on ${formatDateDisplay(task.createdDate)}`;
+        `Added on ${formatDateDisplay(task.createdDate || originDateStr)}`;
 
       const delBtn = document.getElementById('viewTaskDeleteBtn');
       delBtn.onclick = () => {
@@ -1113,10 +1113,29 @@
     function toggleTaskComplete(taskId, originDateStr, event) {
       event.stopPropagation();
       if (!db.logs[originDateStr] || !db.logs[originDateStr].tasks) return;
-      const task = db.logs[originDateStr].tasks.find(t => t.id === taskId);
-      if (task) {
-        task.completed = !task.completed;
+
+      const taskIndex = db.logs[originDateStr].tasks.findIndex(t => t.id === taskId);
+      if (taskIndex === -1) return;
+
+      const task = db.logs[originDateStr].tasks[taskIndex];
+
+      if (!task.completed) {
+        // Mark as completed and record the completion date
+        task.completed = true;
+        task.completedDate = currentDate;
+
+        // If completed on a different date than where it was stored, move it to current active date
+        if (originDateStr !== currentDate) {
+          db.logs[originDateStr].tasks.splice(taskIndex, 1);
+          ensureDateStructure(currentDate);
+          db.logs[currentDate].tasks.push(task);
+        }
+      } else {
+        // Unmark completed
+        task.completed = false;
+        delete task.completedDate;
       }
+
       saveState();
     }
 
@@ -1247,7 +1266,7 @@
           db.logs[dateStr].tasks.forEach(task => {
             if (!task.completed) {
               overdueCount++;
-              const daysOverdue = calculateDaysOverdue(task.createdDate, currentDate);
+              const daysOverdue = calculateDaysOverdue(task.createdDate || dateStr, currentDate);
               overdueTasks.push({ task, originDateStr: dateStr, daysOverdue });
             }
           });
@@ -1283,9 +1302,15 @@
       card.onclick = () => openViewTaskModal(task.id, originDateStr);
 
       const formattedPriority = normalizePriority(task.priority);
-      const metaText = isOverdue
-        ? `from ${formatDateDisplay(originDateStr)} · ${daysOverdue}d overdue`
-        : `added ${formatDateDisplay(originDateStr)}${task.dueDate ? ' · due ' + formatDateDisplay(task.dueDate) : ''}`;
+      
+      let metaText = '';
+      if (task.completed && task.completedDate && task.createdDate && task.completedDate !== task.createdDate) {
+        metaText = `created ${formatDateDisplay(task.createdDate)} · completed ${formatDateDisplay(task.completedDate)}`;
+      } else if (isOverdue) {
+        metaText = `from ${formatDateDisplay(originDateStr)} · ${daysOverdue}d overdue`;
+      } else {
+        metaText = `added ${formatDateDisplay(task.createdDate || originDateStr)}${task.dueDate ? ' · due ' + formatDateDisplay(task.dueDate) : ''}`;
+      }
 
       let subtasksHtml = '';
       if (task.subtasks && task.subtasks.length > 0) {
